@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: myth-ai-chat
+    env: python
+    plan: free # or "starter" for a more powerful instance
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn --worker-tmp-dir /dev/shm app:app"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11
+      - key: GEMINI_API_KEY
+        # This is a secret! Set its value in the Render dashboard, not here.
+        fromService:
+          type: secret_file
+          name: gemini_api_key
+          key: GEMINI_API_KEY
+      - key: SECRET_KEY
+        # This is a secret! Generate a value in the Render dashboard.
+        generateValue: true
