@@ -93,8 +93,8 @@ def initialize_database():
         advertiser = User(id='adminexample', username='adminexample', password_hash=generate_password_hash(ad_pass), role='advertiser', plan='pro')
         DB['users']['adminexample'] = advertiser
 
-@app.before_first_request
-def setup_application():
+# Initialize the database when the app starts
+with app.app_context():
     initialize_database()
 
 # --- 5. HTML, CSS, and JavaScript Frontend ---
@@ -1472,8 +1472,8 @@ def set_announcement():
 
 # This part is for local execution only. Gunicorn on Render will not run this.
 if __name__ == '__main__':
-    initialize_database()
     # The host must be '0.0.0.0' to be accessible within Render's container
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
+
 
 
