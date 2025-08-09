@@ -76,6 +76,10 @@ def initialize_database():
         admin_pass = os.environ.get('ADMIN_PASSWORD', 'adminadminnoob')
         admin = User(id='nameadmin', username='nameadmin', password_hash=generate_password_hash(admin_pass), role='admin', plan='pro')
         DB['users']['nameadmin'] = admin
+    if not User.get_by_username('adminexample'):
+        ad_pass = 'adpass'
+        advertiser = User(id='adminexample', username='adminexample', password_hash=generate_password_hash(ad_pass), role='advertiser', plan='pro')
+        DB['users']['adminexample'] = advertiser
 
 # Initialize the database when the app starts
 initialize_database()
@@ -176,11 +180,51 @@ HTML_CONTENT = """
                     <button id="auth-toggle-btn" class="text-sm text-blue-400 hover:text-blue-300">Don't have an account? Sign Up</button>
                 </div>
             </div>
-             <div class="text-center mt-4">
+             <div class="text-center mt-4 flex justify-center gap-4">
                 <button id="privacy-policy-link" class="text-xs text-gray-500 hover:text-gray-400">Privacy Policy</button>
+                <button id="ad-login-link" class="text-xs text-gray-500 hover:text-gray-400">Advertiser Login</button>
             </div>
         </div>
     </template>
+    
+    <template id="template-ad-login-page">
+        <div class="flex flex-col items-center justify-center h-full w-full bg-gray-900 p-4">
+            <div class="w-full max-w-md glassmorphism rounded-2xl p-8 shadow-2xl animate-scale-up">
+                <div class="flex justify-center mb-6" id="ad-login-logo-container"></div>
+                <h2 class="text-3xl font-bold text-center text-white mb-2">Advertiser Login</h2>
+                <p class="text-gray-400 text-center mb-8">Access your advertising dashboard.</p>
+                <form id="ad-login-form">
+                    <div class="mb-4">
+                        <label for="ad-username" class="block text-sm font-medium text-gray-300 mb-1">Username</label>
+                        <input type="text" id="ad-username" name="username" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" required>
+                    </div>
+                    <div class="mb-6">
+                        <label for="ad-password" class="block text-sm font-medium text-gray-300 mb-1">Password</label>
+                        <input type="password" id="ad-password" name="password" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" required>
+                    </div>
+                    <button type="submit" class="w-full bg-gradient-to-r from-green-600 to-teal-600 hover:opacity-90 text-white font-bold py-3 px-4 rounded-lg transition-opacity">Login</button>
+                    <p id="ad-login-error" class="text-red-400 text-sm text-center h-4 mt-3"></p>
+                </form>
+            </div>
+             <div class="text-center mt-4">
+                <button id="back-to-main-login" class="text-xs text-gray-500 hover:text-gray-400">Back to Main Login</button>
+            </div>
+        </div>
+    </template>
+    
+    <template id="template-ad-dashboard">
+        <div class="w-full h-full bg-gray-900 p-4 sm:p-6 md:p-8 overflow-y-auto">
+            <header class="flex justify-between items-center mb-8">
+                <h1 class="text-3xl font-bold brand-gradient">Advertiser Dashboard</h1>
+                <button id="ad-logout-btn" class="bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded-lg transition-colors">Logout</button>
+            </header>
+            <div class="max-w-4xl mx-auto glassmorphism rounded-lg p-8">
+                <h2 class="text-2xl font-bold text-white mb-4">Welcome, Advertiser!</h2>
+                <p class="text-gray-300">This is a placeholder for your ad campaign management tools.</p>
+            </div>
+        </div>
+    </template>
+
 
     <template id="template-app-wrapper">
         <div class="flex h-full w-full">
@@ -491,6 +535,33 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
         document.getElementById('privacy-policy-link').onclick = renderPrivacyPolicyPage;
+        document.getElementById('ad-login-link').onclick = renderAdLoginPage;
+    }
+    
+    function renderAdLoginPage() {
+        const template = document.getElementById('template-ad-login-page');
+        DOMElements.appContainer.innerHTML = '';
+        DOMElements.appContainer.appendChild(template.content.cloneNode(true));
+        renderLogo('ad-login-logo-container');
+        document.getElementById('back-to-main-login').onclick = () => renderAuthPage(true);
+        const form = document.getElementById('ad-login-form');
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            const errorEl = document.getElementById('ad-login-error');
+            errorEl.textContent = '';
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+            const result = await apiCall('/api/ad_login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            if (result.success) {
+                initializeApp(result.user, {}, {}); // No chats/settings for advertisers for now
+            } else {
+                errorEl.textContent = result.error;
+            }
+        };
     }
 
     async function checkLoginStatus() {
@@ -513,6 +584,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (user.role === 'admin') {
             renderAdminDashboard();
+        } else if (user.role === 'advertiser') {
+            renderAdDashboard();
         } else {
             renderAppUI();
         }
@@ -798,6 +871,7 @@ document.addEventListener('DOMContentLoaded', () => {
             switch (target.id) {
                 case 'new-chat-btn': createNewChat(true); break;
                 case 'logout-btn': handleLogout(); break;
+                case 'ad-logout-btn': handleLogout(); break;
                 case 'send-btn': handleSendMessage(); break;
                 case 'stop-generating-btn': appState.abortController?.abort(); break;
                 case 'rename-chat-btn': handleRenameChat(); break;
@@ -950,6 +1024,13 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('announcement-form').onsubmit = handleSetAnnouncement;
         fetchAdminData();
     }
+    
+    function renderAdDashboard() {
+        const template = document.getElementById('template-ad-dashboard');
+        DOMElements.appContainer.innerHTML = '';
+        DOMElements.appContainer.appendChild(template.content.cloneNode(true));
+        setupAppEventListeners();
+    }
 
     async function fetchAdminData() {
         const data = await apiCall('/api/admin_data');
@@ -1086,13 +1167,26 @@ def login():
     data = request.get_json()
     username, password = data.get('username'), data.get('password')
     user = User.get_by_username(username)
-    if user and check_password_hash(user.password_hash, password):
+    if user and user.role != 'advertiser' and check_password_hash(user.password_hash, password):
         login_user(user, remember=True)
         return jsonify({
             "success": True, "user": get_user_data_for_frontend(user),
             "chats": get_all_user_chats(user.id), "settings": DB['site_settings']
         })
     return jsonify({"error": "Invalid username or password."}), 401
+    
+@app.route('/api/ad_login', methods=['POST'])
+def ad_login():
+    data = request.get_json()
+    username, password = data.get('username'), data.get('password')
+    user = User.get_by_username(username)
+    if user and user.role == 'advertiser' and check_password_hash(user.password_hash, password):
+        login_user(user, remember=True)
+        return jsonify({
+            "success": True, 
+            "user": get_user_data_for_frontend(user)
+        })
+    return jsonify({"error": "Invalid advertiser credentials."}), 401
 
 @app.route('/api/logout')
 def logout():
@@ -1296,7 +1390,4 @@ def set_announcement():
 # This part is for local execution only. Gunicorn on Render will not run this.
 if __name__ == '__main__':
     # The host must be '0.0.0.0' to be accessible within Render's container
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=Fal
-
-
-
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
