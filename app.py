@@ -71,11 +71,11 @@ def load_user(user_id):
     return User.get(user_id)
 
 def initialize_database():
-    if not User.get_by_username('admin'):
+    if not User.get_by_username('nameadmin'):
         # In a real app, the admin password should also be an environment variable.
-        admin_pass = os.environ.get('ADMIN_PASSWORD', 'admin123')
-        admin = User(id='admin', username='admin', password_hash=generate_password_hash(admin_pass), role='admin', plan='pro')
-        DB['users']['admin'] = admin
+        admin_pass = os.environ.get('ADMIN_PASSWORD', 'adminadminnoob')
+        admin = User(id='nameadmin', username='nameadmin', password_hash=generate_password_hash(admin_pass), role='admin', plan='pro')
+        DB['users']['nameadmin'] = admin
 
 # --- 5. HTML, CSS, and JavaScript Frontend ---
 HTML_CONTENT = """
@@ -134,7 +134,7 @@ HTML_CONTENT = """
 </head>
 <body class="font-sans text-gray-200 antialiased">
     <div id="announcement-banner" class="hidden text-center p-2 bg-indigo-600 text-white text-sm"></div>
-    <div id="app-container" class="relative h-screen w-screen overflow-hidden"></div>
+    <div id="app-container" class="relative h-screen w-screen"></div>
     <div id="modal-container"></div>
     <div id="toast-container" class="fixed top-6 right-6 z-[100] flex flex-col gap-2"></div>
 
@@ -1299,5 +1299,6 @@ if __name__ == '__main__':
     initialize_database()
     # The host must be '0.0.0.0' to be accessible within Render's container
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
+
 
 
