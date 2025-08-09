@@ -9,6 +9,7 @@ from functools import wraps
 import google.generativeai as genai
 from dotenv import load_dotenv
 import stripe
+import random
 
 # --- 1. Logging and API Configuration ---
 load_dotenv() # Loads the .env file for local development
@@ -39,11 +40,23 @@ if not STRIPE_PUBLIC_KEY:
 
 # --- 2. Application Setup ---
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a-very-secret-and-long-random-key-for-myth-ai-v3')
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a-very-secret-and-long-random-key-for-studyai-v1')
 SECRET_REGISTRATION_KEY = os.environ.get('SECRET_REGISTRATION_KEY', 'SUPER_SECRET_KEY_123')
 
+# --- 3. Core AI Persona ---
+# This system prompt enforces the "Study Buddy" persona for all interactions.
+STUDY_BUDDY_SYSTEM_PROMPT = """
+You are StudyAI, a friendly and encouraging academic assistant. Your primary goal is to help students understand subjects and learn effectively, not to do their work for them. You are a "study buddy" who guides them to the answers.
 
-# --- 3. User and Session Management (Flask-Login) ---
+Your core principles are:
+1.  **NEVER give direct answers to homework questions.** If a user asks for an answer to a specific problem (e.g., "What is the solution to 2x + 5 = 15?" or "Write me an essay about the Great Depression"), you must refuse.
+2.  **Instead of giving answers, guide the user.** Break down the problem into smaller steps. Ask leading questions to help them think. Explain the underlying concepts and formulas.
+3.  **Provide practice and examples.** Offer similar, but not identical, practice problems to help them solidify their understanding.
+4.  **Be motivational and positive.** Use encouraging language. Frame challenges as learning opportunities. Phrases like "You've got this!", "That's a great question!", "Let's tackle this together," and "What's the first step you think we should take?" are perfect.
+5.  **Keep it conversational.** You are a buddy, not a formal tutor. Be approachable and friendly.
+"""
+
+# --- 4. User and Session Management (Flask-Login) ---
 login_manager = LoginManager()
 login_manager.init_app(app)
 
@@ -51,11 +64,12 @@ login_manager.init_app(app)
 def unauthorized():
     return jsonify({"error": "Login required.", "logged_in": False}), 401
 
-# --- 4. Mock Database and Data Models ---
+# --- 5. Mock Database and Data Models ---
 DB = {
     "users": {},
     "chats": {},
-    "site_settings": {"announcement": "Welcome to the new Myth AI 2.2!"}
+    "ads": {}, # NEW: Database table for advertisements
+    "site_settings": {"announcement": "Welcome to StudyAI! Your new academic partner."}
 }
 
 class User(UserMixin):
@@ -92,20 +106,31 @@ def initialize_database():
         ad_pass = 'adpass'
         advertiser = User(id='adminexample', username='adminexample', password_hash=generate_password_hash(ad_pass), role='advertiser', plan='pro')
         DB['users']['adminexample'] = advertiser
+        # Add a sample ad for the advertiser
+        ad_id = f"ad_{advertiser.id}_{datetime.now().timestamp()}"
+        DB['ads'][ad_id] = {
+            "id": ad_id,
+            "advertiser_id": advertiser.id,
+            "title": "Campus Bookstore Sale!",
+            "content": "Get 20% off all textbooks this week. Don't miss out!",
+            "status": "active",
+            "views": random.randint(1000, 5000),
+            "clicks": random.randint(50, 200)
+        }
+
 
 # Initialize the database when the app starts
 with app.app_context():
     initialize_database()
 
-# --- 5. HTML, CSS, and JavaScript Frontend ---
+# --- 6. HTML, CSS, and JavaScript Frontend ---
 HTML_CONTENT = """
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Myth AI 2.2</title>
-    <meta name="description" content="An advanced, feature-rich AI chat application prototype.">
+    <title>StudyAI ✨</title> <meta name="description" content="An AI-powered study buddy to help you learn effectively.">
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1136294351029434"
      crossorigin="anonymous"></script>
     <script src="https://js.stripe.com/v3/"></script>
@@ -177,27 +202,27 @@ HTML_CONTENT = """
             <div class="w-full max-w-md glassmorphism rounded-2xl p-8 shadow-2xl animate-scale-up">
                 <div class="flex justify-center mb-6" id="auth-logo-container"></div>
                 <h2 class="text-3xl font-bold text-center text-white mb-2" id="auth-title">Welcome Back</h2>
-                <p class="text-gray-400 text-center mb-8" id="auth-subtitle">Sign in to continue to Myth AI.</p>
+                <p class="text-gray-400 text-center mb-8" id="auth-subtitle">Sign in to continue to StudyAI.</p>
                 <form id="auth-form">
                     <div class="mb-4">
                         <label for="username" class="block text-sm font-medium text-gray-300 mb-1">Username</label>
-                        <input type="text" id="username" name="username" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" required>
+                        <input type="text" id="username" name="username" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all" required>
                     </div>
                     <div class="mb-6">
                         <label for="password" class="block text-sm font-medium text-gray-300 mb-1">Password</label>
-                        <input type="password" id="password" name="password" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" required>
+                        <input type="password" id="password" name="password" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all" required>
                     </div>
-                    <button type="submit" id="auth-submit-btn" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-90 text-white font-bold py-3 px-4 rounded-lg transition-opacity">Login</button>
+                    <button type="submit" id="auth-submit-btn" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 hover:opacity-90 text-white font-bold py-3 px-4 rounded-lg transition-opacity">Login</button>
                     <p id="auth-error" class="text-red-400 text-sm text-center h-4 mt-3"></p>
                 </form>
                 <div class="text-center mt-6">
-                    <button id="auth-toggle-btn" class="text-sm text-blue-400 hover:text-blue-300">Don't have an account? Sign Up</button>
+                    <button id="auth-toggle-btn" class="text-sm text-amber-400 hover:text-amber-300">Don't have an account? Sign Up</button>
                 </div>
             </div>
              <div class="text-center mt-4 flex justify-center gap-4">
-                <button id="privacy-policy-link" class="text-xs text-gray-500 hover:text-gray-400">Privacy Policy</button>
-                <button id="special-auth-link" class="text-xs text-gray-500 hover:text-gray-400">Admin & Ad Portal</button>
-            </div>
+                 <button id="privacy-policy-link" class="text-xs text-gray-500 hover:text-gray-400">Privacy Policy</button>
+                 <button id="special-auth-link" class="text-xs text-gray-500 hover:text-gray-400">Admin & Ad Portal</button>
+             </div>
         </div>
     </template>
     
@@ -236,16 +261,40 @@ HTML_CONTENT = """
             </div>
         </div>
     </template>
-
+    
     <template id="template-ad-dashboard">
         <div class="w-full h-full bg-gray-900 p-4 sm:p-6 md:p-8 overflow-y-auto">
-            <header class="flex justify-between items-center mb-8">
+            <header class="flex flex-wrap justify-between items-center gap-4 mb-8">
                 <h1 class="text-3xl font-bold brand-gradient">Advertiser Dashboard</h1>
                 <button id="ad-logout-btn" class="bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded-lg transition-colors">Logout</button>
             </header>
-            <div class="max-w-4xl mx-auto glassmorphism rounded-lg p-8">
-                <h2 class="text-2xl font-bold text-white mb-4">Welcome, Advertiser!</h2>
-                <p class="text-gray-300">This is a placeholder for your ad campaign management tools.</p>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+                <div class="lg:col-span-1">
+                    <div class="p-6 glassmorphism rounded-lg">
+                        <h2 class="text-2xl font-bold text-white mb-4">Create New Ad</h2>
+                        <form id="create-ad-form" class="space-y-4">
+                            <div>
+                                <label for="ad-title" class="block text-sm font-medium text-gray-300 mb-1">Ad Title</label>
+                                <input id="ad-title" type="text" placeholder="e.g., Summer Tutoring" class="w-full p-2 bg-gray-700/50 rounded-lg border border-gray-600" required>
+                            </div>
+                            <div>
+                                <label for="ad-content" class="block text-sm font-medium text-gray-300 mb-1">Ad Content</label>
+                                <textarea id="ad-content" rows="3" placeholder="e.g., Special offer for new students!" class="w-full p-2 bg-gray-700/50 rounded-lg border border-gray-600" required></textarea>
+                            </div>
+                            <button type="submit" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-90 text-white font-bold py-2 px-4 rounded-lg">Create Ad</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-2">
+                    <div class="p-6 glassmorphism rounded-lg">
+                         <h2 class="text-2xl font-bold text-white mb-4">Your Campaigns</h2>
+                         <div id="ad-list-container" class="space-y-4">
+                            <p class="text-gray-400">Loading your ad campaigns...</p>
+                         </div>
+                    </div>
+                </div>
             </div>
         </div>
     </template>
@@ -256,8 +305,7 @@ HTML_CONTENT = """
             <aside id="sidebar" class="bg-gray-900/70 backdrop-blur-lg w-72 flex-shrink-0 flex flex-col p-2 h-full absolute md:relative z-20 transform transition-transform duration-300 ease-in-out -translate-x-full md:translate-x-0">
                 <div class="flex-shrink-0 p-2 mb-2 flex items-center gap-3">
                     <div id="app-logo-container"></div>
-                    <h1 class="text-2xl font-bold brand-gradient">Myth AI 2.2</h1>
-                </div>
+                    <h1 class="text-2xl font-bold brand-gradient">StudyAI ✨</h1> </div>
                 <div class="flex-shrink-0"><button id="new-chat-btn" class="w-full text-left flex items-center gap-3 p-3 rounded-lg hover:bg-gray-700/50 transition-colors duration-200"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14" /><path d="M5 12h14" /></svg> New Chat</button></div>
                 <div id="chat-history-list" class="flex-grow overflow-y-auto my-4 space-y-1 pr-1"></div>
                 <div class="flex-shrink-0 border-t border-gray-700 pt-2 space-y-1">
@@ -288,7 +336,7 @@ HTML_CONTENT = """
                             <button id="stop-generating-btn" class="bg-red-600/50 hover:bg-red-600/80 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center gap-2 mx-auto"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><rect width="10" height="10" x="3" y="3" rx="1"/></svg> Stop Generating</button>
                         </div>
                         <div class="relative glassmorphism rounded-2xl shadow-lg">
-                            <textarea id="user-input" placeholder="Message Myth AI..." class="w-full bg-transparent p-4 pr-16 resize-none rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" rows="1"></textarea>
+                            <textarea id="user-input" placeholder="Message StudyAI..." class="w-full bg-transparent p-4 pr-16 resize-none rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" rows="1"></textarea>
                             <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
                                 <button id="send-btn" class="p-2 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-90 transition-opacity disabled:from-gray-500 disabled:to-gray-600 disabled:cursor-not-allowed"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M2 22l20-10L2 2z"/></svg></button>
                             </div>
@@ -299,17 +347,12 @@ HTML_CONTENT = """
             </main>
         </div>
     </template>
-
+    
     <template id="template-welcome-screen">
         <div class="flex flex-col items-center justify-center h-full text-center p-4 animate-fade-in">
             <div class="w-24 h-24 mb-6" id="welcome-logo-container"></div>
-            <h2 class="text-3xl md:text-4xl font-bold mb-4">Welcome to Myth AI 2.2</h2>
-            <p class="text-gray-400 max-w-md">Start a new conversation or select one from the sidebar. How can I help you today?</p>
-            <div class="mt-8 p-4 glassmorphism rounded-lg max-w-xl w-full">
-                <label for="system-prompt-input" class="block text-sm font-medium text-gray-300 mb-2">Set a Persona (System Prompt)</label>
-                <textarea id="system-prompt-input" placeholder="e.g., You are a helpful assistant that speaks like a pirate." class="w-full bg-gray-700/50 p-2 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" rows="2"></textarea>
-                <button id="save-system-prompt-btn" class="mt-2 w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded-lg transition-colors">Set for this Chat</button>
-            </div>
+            <h2 class="text-3xl md:text-4xl font-bold mb-4">Welcome to StudyAI</h2>
+            <p class="text-gray-400 max-w-md">Your personal AI study buddy. Ready to tackle your studies? Let's begin!</p>
         </div>
     </template>
 
@@ -323,7 +366,7 @@ HTML_CONTENT = """
             </div>
         </div>
     </template>
-
+    
     <template id="template-admin-dashboard">
         <div class="w-full h-full bg-gray-900 p-4 sm:p-6 md:p-8 overflow-y-auto">
             <header class="flex flex-wrap justify-between items-center gap-4 mb-8">
@@ -344,7 +387,7 @@ HTML_CONTENT = """
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <div class="p-6 glassmorphism rounded-lg"><h2 class="text-gray-400 text-lg">Total Users</h2><p id="admin-total-users" class="text-4xl font-bold text-white">0</p></div>
-                <div class="p-6 glassmorphism rounded-lg"><h2 class="text-gray-400 text-lg">Total API Calls (Today)</h2><p id="admin-total-calls" class="text-4xl font-bold text-white">0</p></div>
+                <div class="p-6 glassmorphism rounded-lg"><h2 class="text-gray-400 text-lg">Total Messages (Today)</h2><p id="admin-total-calls" class="text-4xl font-bold text-white">0</p></div>
                 <div class="p-6 glassmorphism rounded-lg"><h2 class="text-gray-400 text-lg">Pro Users</h2><p id="admin-pro-users" class="text-4xl font-bold text-white">0</p></div>
             </div>
 
@@ -356,7 +399,8 @@ HTML_CONTENT = """
                             <tr>
                                 <th class="p-2">Username</th>
                                 <th class="p-2">Plan</th>
-                                <th class="p-2">Usage</th>
+                                <th class="p-2">Daily Usage</th>
+                                <th class="p-2">Last Active</th>
                                 <th class="p-2">Actions</th>
                             </tr>
                         </thead>
@@ -398,7 +442,7 @@ HTML_CONTENT = """
             </div>
         </div>
     </template>
-
+    
     <template id="template-privacy-policy">
         <div class="w-full h-full bg-gray-900 p-4 sm:p-6 md:p-8 overflow-y-auto">
              <header class="flex justify-between items-center mb-8">
@@ -407,7 +451,7 @@ HTML_CONTENT = """
             </header>
             <div class="max-w-4xl mx-auto glassmorphism rounded-lg p-8 prose prose-invert">
                 <h2>1. Introduction</h2>
-                <p>Welcome to Myth AI. This Privacy Policy explains how we collect, use, and disclose information about you when you use our service. <strong>This is a template policy and not legal advice.</strong></p>
+                <p>Welcome to StudyAI. This Privacy Policy explains how we collect, use, and disclose information about you when you use our service. <strong>This is a template policy and not legal advice.</strong></p>
                 
                 <h2>2. Information We Collect</h2>
                 <p>We collect the following information:</p>
@@ -440,7 +484,7 @@ HTML_CONTENT = """
 
 <script>
 /****************************************************************************
- * JAVASCRIPT FRONTEND LOGIC (MYTH AI 2.2)
+ * JAVASCRIPT FRONTEND LOGIC (StudyAI v1.0)
  ****************************************************************************/
 document.addEventListener('DOMContentLoaded', () => {
     const appState = {
@@ -531,13 +575,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const errorEl = document.getElementById('auth-error');
         if (isLogin) {
             title.textContent = 'Welcome Back';
-            subtitle.textContent = 'Sign in to continue to Myth AI.';
+            subtitle.textContent = 'Sign in to continue to StudyAI.';
             submitBtn.textContent = 'Login';
             toggleBtn.textContent = "Don't have an account? Sign Up";
             form.action = '/api/login';
         } else {
             title.textContent = 'Create Account';
-            subtitle.textContent = 'Join Myth AI to get started.';
+            subtitle.textContent = 'Join StudyAI to get started.';
             submitBtn.textContent = 'Sign Up';
             toggleBtn.textContent = 'Already have an account? Login';
             form.action = '/api/signup';
@@ -650,39 +694,18 @@ document.addEventListener('DOMContentLoaded', () => {
             renderCodeCopyButtons();
         } else {
             chatTitle.textContent = 'New Chat';
-            renderWelcomeScreen(chat ? chat.system_prompt : '');
+            renderWelcomeScreen(); // Removed system prompt pass-through
         }
         updateUIState();
     }
 
-    function renderWelcomeScreen(systemPrompt = '') {
+    function renderWelcomeScreen() { // MODIFIED: Simplified
         const chatWindow = document.getElementById('chat-window');
         if (!chatWindow) return;
         const template = document.getElementById('template-welcome-screen');
         chatWindow.innerHTML = '';
         chatWindow.appendChild(template.content.cloneNode(true));
         renderLogo('welcome-logo-container');
-        const systemPromptInput = document.getElementById('system-prompt-input');
-        systemPromptInput.value = systemPrompt;
-        document.getElementById('save-system-prompt-btn').onclick = async () => {
-            if (!appState.activeChatId) {
-                const chatCreated = await createNewChat(false);
-                if (!chatCreated) {
-                      showToast("Could not create chat to save prompt.", "error");
-                      return;
-                }
-            }
-            const prompt = systemPromptInput.value;
-            const result = await apiCall('/api/chat/system_prompt', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: appState.activeChatId, system_prompt: prompt }),
-            });
-            if (result.success) {
-                appState.chats[appState.activeChatId].system_prompt = prompt;
-                showToast(result.message, 'success');
-            }
-        };
     }
 
     function renderChatHistoryList() {
@@ -841,7 +864,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const wrapper = document.createElement('div');
         wrapper.className = 'message-wrapper flex items-start gap-4';
         const senderIsAI = msg.sender === 'model';
-        const avatarChar = senderIsAI ? 'M' : appState.currentUser.username[0].toUpperCase();
+        const avatarChar = senderIsAI ? 'S' : appState.currentUser.username[0].toUpperCase();
         const avatarColor = senderIsAI
             ? 'bg-gradient-to-br from-blue-500 to-indigo-600'
             : `background-color: hsl(${appState.currentUser.username.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % 360}, 50%, 60%)`;
@@ -853,7 +876,7 @@ document.addEventListener('DOMContentLoaded', () => {
         wrapper.innerHTML = `
             ${senderIsAI ? aiAvatarHTML : userAvatarHTML}
             <div class="flex-1 min-w-0">
-                <div class="font-bold text-gray-300">${senderIsAI ? 'Myth AI' : 'You'}</div>
+                <div class="font-bold text-gray-300">${senderIsAI ? 'StudyAI' : 'You'}</div>
                 <div class="prose prose-invert max-w-none text-gray-200 message-content">
                     ${isStreaming ? '<span class="animate-pulse">...</span>' : DOMPurify.sanitize(marked.parse(msg.content))}
                 </div>
@@ -997,9 +1020,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const chat = appState.chats[appState.activeChatId];
         if (!chat) return;
         let markdownContent = `# ${chat.title}\\n\\n`;
-        if(chat.system_prompt) markdownContent += `**System Prompt:** ${chat.system_prompt}\\n\\n---\\n\\n`;
+        markdownContent += `**Persona:** Study Buddy\\n\\n---\\n\\n`;
         chat.messages.forEach(msg => {
-            const prefix = msg.sender === 'model' ? '**Myth AI**' : '**You**';
+            const prefix = msg.sender === 'model' ? '**StudyAI**' : '**You**';
             markdownContent += `${prefix}:\\n${msg.content}\\n\\n---\\n\\n`;
         });
         const blob = new Blob([markdownContent], { type: 'text/markdown' });
@@ -1053,6 +1076,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- NEW/MODIFIED: Admin and Advertiser Functions ---
+
     function renderAdminDashboard() {
         const template = document.getElementById('template-admin-dashboard');
         DOMElements.appContainer.innerHTML = '';
@@ -1063,11 +1088,14 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchAdminData();
     }
     
+    // NEW: Advertiser Dashboard Rendering
     function renderAdDashboard() {
         const template = document.getElementById('template-ad-dashboard');
         DOMElements.appContainer.innerHTML = '';
         DOMElements.appContainer.appendChild(template.content.cloneNode(true));
-        setupAppEventListeners();
+        setupAppEventListeners(); // For logout button
+        document.getElementById('create-ad-form').onsubmit = handleCreateAd;
+        fetchAdvertiserData();
     }
 
     async function fetchAdminData() {
@@ -1086,16 +1114,62 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td class="p-2">${user.username}</td>
                 <td class="p-2">${user.plan}</td>
                 <td class="p-2">${user.daily_messages} / ${user.message_limit}</td>
-                <td class="p-2 flex gap-2">
+                <td class="p-2 text-sm text-gray-400">${user.last_message_date}</td>
+                <td class="p-2 flex flex-wrap gap-2">
                     <button data-userid="${user.id}" class="toggle-plan-btn text-xs px-2 py-1 rounded ${user.plan === 'pro' ? 'bg-yellow-600' : 'bg-blue-600'}">
                         ${user.plan === 'pro' ? 'Make Free' : 'Make Pro'}
                     </button>
+                    <button data-userid="${user.id}" class="reset-usage-btn text-xs px-2 py-1 rounded bg-green-600">Reset Usage</button>
                     <button data-userid="${user.id}" class="delete-user-btn text-xs px-2 py-1 rounded bg-red-600">Delete</button>
                 </td>`;
             userList.appendChild(tr);
         });
         userList.querySelectorAll('.toggle-plan-btn').forEach(btn => btn.onclick = handleAdminTogglePlan);
+        userList.querySelectorAll('.reset-usage-btn').forEach(btn => btn.onclick = handleAdminResetUsage);
         userList.querySelectorAll('.delete-user-btn').forEach(btn => btn.onclick = handleAdminDeleteUser);
+    }
+    
+    // NEW: Fetch and display advertiser-specific data
+    async function fetchAdvertiserData() {
+        const result = await apiCall('/api/advertiser_data');
+        const container = document.getElementById('ad-list-container');
+        if (!container) return;
+
+        if (result.success && result.ads) {
+            if (result.ads.length === 0) {
+                 container.innerHTML = '<p class="text-gray-400">You have no active ad campaigns. Create one to get started!</p>';
+                 return;
+            }
+            container.innerHTML = ''; // Clear loading text
+            result.ads.forEach(ad => {
+                const adCard = document.createElement('div');
+                adCard.className = 'p-4 border border-gray-700 rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4';
+                adCard.innerHTML = `
+                    <div class="flex-grow">
+                        <h3 class="font-bold text-white">${ad.title}</h3>
+                        <p class="text-sm text-gray-300">${ad.content}</p>
+                        <div class="flex gap-4 text-xs mt-2 text-gray-400">
+                           <span>Views: ${ad.views}</span>
+                           <span>Clicks: ${ad.clicks}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        <span class="text-xs font-semibold px-2 py-1 rounded-full ${ad.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}">
+                           ${ad.status}
+                        </span>
+                        <button data-adid="${ad.id}" class="toggle-ad-btn text-xs px-2 py-1 rounded ${ad.status === 'active' ? 'bg-yellow-600' : 'bg-green-600'}">
+                             ${ad.status === 'active' ? 'Pause' : 'Activate'}
+                        </button>
+                        <button data-adid="${ad.id}" class="delete-ad-btn text-xs px-2 py-1 rounded bg-red-600">Delete</button>
+                    </div>
+                `;
+                container.appendChild(adCard);
+            });
+            container.querySelectorAll('.toggle-ad-btn').forEach(btn => btn.onclick = handleToggleAd);
+            container.querySelectorAll('.delete-ad-btn').forEach(btn => btn.onclick = handleDeleteAd);
+        } else {
+            container.innerHTML = '<p class="text-red-400">Could not load ad campaigns.</p>';
+        }
     }
 
     async function handleSetAnnouncement(e) {
@@ -1129,6 +1203,20 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchAdminData();
         }
     }
+    
+    // NEW: Handler for Reset Usage button
+    async function handleAdminResetUsage(e) {
+        const userId = e.target.dataset.userid;
+        const result = await apiCall('/api/admin/reset_usage', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: userId }),
+        });
+        if (result.success) {
+            showToast(result.message, 'success');
+            fetchAdminData();
+        }
+    }
 
     function handleAdminDeleteUser(e) {
         const userId = e.target.dataset.userid;
@@ -1145,6 +1233,53 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 'Delete User');
     }
 
+    // NEW: Advertiser action handlers
+    async function handleCreateAd(e) {
+        e.preventDefault();
+        const title = document.getElementById('ad-title').value;
+        const content = document.getElementById('ad-content').value;
+        if (!title || !content) {
+            showToast("Title and content are required.", "error");
+            return;
+        }
+        const result = await apiCall('/api/ad/new', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, content }),
+        });
+        if(result.success) {
+            showToast("Ad created successfully!", "success");
+            document.getElementById('create-ad-form').reset();
+            fetchAdvertiserData();
+        }
+    }
+    async function handleToggleAd(e) {
+        const adId = e.target.dataset.adid;
+        const result = await apiCall('/api/ad/toggle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ad_id: adId }),
+        });
+        if(result.success) {
+            showToast("Ad status updated.", "success");
+            fetchAdvertiserData();
+        }
+    }
+    function handleDeleteAd(e) {
+        const adId = e.target.dataset.adid;
+        openModal('Delete Ad', 'Are you sure you want to permanently delete this ad campaign?', async () => {
+            const result = await apiCall('/api/ad/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ad_id: adId }),
+            });
+            if (result.success) {
+                showToast(result.message, 'success');
+                fetchAdvertiserData();
+            }
+        }, 'Delete Ad');
+    }
+
     checkLoginStatus();
 });
 </script>
@@ -1152,7 +1287,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </html>
 """
 
-# --- 6. Backend Logic (Flask Routes) ---
+# --- 7. Backend Logic (Flask Routes) ---
 PLAN_CONFIG = {
     "free": {"message_limit": 15, "models": ["gemini-1.5-flash-latest"]},
     "pro": {"message_limit": 50, "models": ["gemini-1.5-flash-latest", "gemini-pro"]}
@@ -1264,7 +1399,7 @@ def status():
 @login_required
 def chat_api():
     if not GEMINI_API_CONFIGURED:
-        return jsonify({"error": "Gemini API is not configured on the server."}), 503
+        return jsonify({"error": "AI API is not configured on the server."}), 503
 
     data = request.get_json()
     chat_id, prompt = data.get('chat_id'), data.get('prompt')
@@ -1281,7 +1416,8 @@ def chat_api():
         return jsonify({"error": f"Daily message limit of {plan_details['message_limit']} reached."}), 429
 
     history = []
-    system_instruction = chat.get('system_prompt')
+    # MODIFIED: System instruction is now hardcoded to enforce the StudyAI persona
+    system_instruction = STUDY_BUDDY_SYSTEM_PROMPT
 
     for msg in chat['messages']:
         role = 'model' if msg['sender'] == 'model' else 'user'
@@ -1290,7 +1426,7 @@ def chat_api():
     try:
         model = genai.GenerativeModel(
             'gemini-1.5-flash-latest',
-            system_instruction=system_instruction if system_instruction else None
+            system_instruction=system_instruction
         )
         chat_session = model.start_chat(history=history)
 
@@ -1315,6 +1451,7 @@ def chat_api():
                 chat['messages'].append({'sender': 'user', 'content': prompt})
                 chat['messages'].append({'sender': 'model', 'content': full_response_text})
                 current_user.daily_messages += 1
+                current_user.last_message_date = datetime.now().strftime("%Y-%m-%d") # MODIFIED: Ensure last message date is updated
 
                 if len(chat['messages']) == 2:
                     try:
@@ -1340,7 +1477,7 @@ def new_chat():
     chat_id = f"chat_{current_user.id}_{datetime.now().timestamp()}"
     new_chat_data = {
         "id": chat_id, "user_id": current_user.id, "title": "New Chat",
-        "messages": [], "system_prompt": "", "created_at": datetime.now().isoformat()
+        "messages": [], "created_at": datetime.now().isoformat()
     }
     DB['chats'][chat_id] = new_chat_data
     return jsonify({"success": True, "chat": new_chat_data})
@@ -1366,17 +1503,6 @@ def delete_chat():
         return jsonify({"success": True, "message": "Chat deleted."})
     return jsonify({"error": "Chat not found or access denied."}), 404
 
-@app.route('/api/chat/system_prompt', methods=['POST'])
-@login_required
-def set_system_prompt():
-    data = request.get_json()
-    chat_id, system_prompt = data.get('chat_id'), data.get('system_prompt')
-    chat = DB['chats'].get(chat_id)
-    if chat and chat['user_id'] == current_user.id:
-        chat['system_prompt'] = system_prompt
-        return jsonify({"success": True, "message": "System prompt updated."})
-    return jsonify({"error": "Chat not found or access denied."}), 404
-
 @app.route('/api/create-checkout-session', methods=['POST'])
 @login_required
 def create_checkout_session():
@@ -1389,7 +1515,7 @@ def create_checkout_session():
                     'price_data': {
                         'currency': 'usd',
                         'product_data': {
-                            'name': 'Myth AI Pro Plan',
+                            'name': 'StudyAI Pro Plan',
                         },
                         'unit_amount': 999, # $9.99
                     },
@@ -1400,7 +1526,7 @@ def create_checkout_session():
             success_url=YOUR_DOMAIN + '/payment-success',
             cancel_url=YOUR_DOMAIN + '/payment-cancel',
         )
-        return jsonify({'id': checkout_session.id})
+        return jsonify({'id': checkout_session.id, 'success': True})
     except Exception as e:
         return jsonify(error=str(e)), 403
 
@@ -1415,6 +1541,7 @@ def payment_success():
 def payment_cancel():
     return redirect('/?payment=cancel')
 
+# --- Role-Based Access Control Decorators ---
 def admin_required(f):
     @wraps(f)
     @login_required
@@ -1424,6 +1551,16 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def advertiser_required(f):
+    @wraps(f)
+    @login_required
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or current_user.role != 'advertiser':
+            return jsonify({"error": "Advertiser access required."}), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+# --- Admin Routes ---
 @app.route('/api/admin_data')
 @admin_required
 def admin_data():
@@ -1434,7 +1571,8 @@ def admin_data():
             plan_details = PLAN_CONFIG.get(user.plan, PLAN_CONFIG['free'])
             all_users_data.append({
                 "id": user.id, "username": user.username, "plan": user.plan,
-                "daily_messages": user.daily_messages, "message_limit": plan_details['message_limit']
+                "daily_messages": user.daily_messages, "message_limit": plan_details['message_limit'],
+                "last_message_date": user.last_message_date # NEW: Pass last active date
             })
             total_calls_today += user.daily_messages
             if user.plan == 'pro': pro_users += 1
@@ -1451,6 +1589,15 @@ def admin_toggle_plan():
     if not user: return jsonify({"error": "User not found."}), 404
     user.plan = 'free' if user.plan == 'pro' else 'pro'
     return jsonify({"success": True, "message": f"{user.username}'s plan set to {user.plan}."})
+    
+# NEW: Admin route to reset a user's daily message count
+@app.route('/api/admin/reset_usage', methods=['POST'])
+@admin_required
+def admin_reset_usage():
+    user = User.get(request.json.get('user_id'))
+    if not user: return jsonify({"error": "User not found."}), 404
+    user.daily_messages = 0
+    return jsonify({"success": True, "message": f"{user.username}'s daily usage has been reset."})
 
 @app.route('/api/admin/delete_user', methods=['POST'])
 @admin_required
@@ -1469,10 +1616,58 @@ def admin_delete_user():
 def set_announcement():
     DB['site_settings']['announcement'] = request.json.get('text', '')
     return jsonify({"success": True, "message": "Announcement updated."})
+    
+# --- NEW: Advertiser Routes ---
+@app.route('/api/advertiser_data')
+@advertiser_required
+def advertiser_data():
+    user_ads = [ad for ad in DB['ads'].values() if ad['advertiser_id'] == current_user.id]
+    return jsonify({"success": True, "ads": user_ads})
 
-# This part is for local execution only. Gunicorn on Render will not run this.
+@app.route('/api/ad/new', methods=['POST'])
+@advertiser_required
+def new_ad():
+    data = request.get_json()
+    title, content = data.get('title'), data.get('content')
+    if not title or not content:
+        return jsonify({"error": "Title and content are required."}), 400
+        
+    ad_id = f"ad_{current_user.id}_{datetime.now().timestamp()}"
+    new_ad_data = {
+        "id": ad_id,
+        "advertiser_id": current_user.id,
+        "title": title,
+        "content": content,
+        "status": "active",
+        "views": 0,
+        "clicks": 0
+    }
+    DB['ads'][ad_id] = new_ad_data
+    return jsonify({"success": True, "ad": new_ad_data})
+
+@app.route('/api/ad/toggle', methods=['POST'])
+@advertiser_required
+def toggle_ad():
+    ad_id = request.json.get('ad_id')
+    ad = DB['ads'].get(ad_id)
+    if ad and ad['advertiser_id'] == current_user.id:
+        ad['status'] = 'inactive' if ad['status'] == 'active' else 'active'
+        return jsonify({"success": True, "message": "Ad status toggled."})
+    return jsonify({"error": "Ad not found or access denied."}), 404
+    
+@app.route('/api/ad/delete', methods=['POST'])
+@advertiser_required
+def delete_ad():
+    ad_id = request.json.get('ad_id')
+    ad = DB['ads'].get(ad_id)
+    if ad and ad['advertiser_id'] == current_user.id:
+        del DB['ads'][ad_id]
+        return jsonify({"success": True, "message": "Ad campaign deleted."})
+    return jsonify({"error": "Ad not found or access denied."}), 404
+
+
+# This part is for local execution only.
 if __name__ == '__main__':
-    # The host must be '0.0.0.0' to be accessible within Render's container
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
 
 
