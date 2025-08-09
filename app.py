@@ -152,7 +152,7 @@ HTML_CONTENT = """
     </template>
 
     <template id="template-auth-page">
-        <div class="flex items-center justify-center h-full w-full bg-gray-900 p-4">
+        <div class="flex flex-col items-center justify-center h-full w-full bg-gray-900 p-4">
             <div class="w-full max-w-md glassmorphism rounded-2xl p-8 shadow-2xl animate-scale-up">
                 <div class="flex justify-center mb-6" id="auth-logo-container"></div>
                 <h2 class="text-3xl font-bold text-center text-white mb-2" id="auth-title">Welcome Back</h2>
@@ -173,6 +173,9 @@ HTML_CONTENT = """
                     <button id="auth-toggle-btn" class="text-sm text-blue-400 hover:text-blue-300">Don't have an account? Sign Up</button>
                 </div>
             </div>
+             <div class="text-center mt-4">
+                <button id="privacy-policy-link" class="text-xs text-gray-500 hover:text-gray-400">Privacy Policy</button>
+            </div>
         </div>
     </template>
 
@@ -186,10 +189,12 @@ HTML_CONTENT = """
                 <div class="flex-shrink-0"><button id="new-chat-btn" class="w-full text-left flex items-center gap-3 p-3 rounded-lg hover:bg-gray-700/50 transition-colors duration-200"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14" /><path d="M5 12h14" /></svg> New Chat</button></div>
                 <div id="chat-history-list" class="flex-grow overflow-y-auto my-4 space-y-1 pr-1"></div>
                 <div class="flex-shrink-0 border-t border-gray-700 pt-2 space-y-1">
-                    <div id="user-info" class="p-3 text-sm flex items-center gap-3"></div>
+                    <div id="user-info" class="p-3 text-sm"></div>
+                    <button id="upgrade-plan-btn" class="w-full text-left flex items-center gap-3 p-3 rounded-lg hover:bg-indigo-500/20 text-indigo-400 transition-colors duration-200"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6v12m-6-6h12"/></svg> Upgrade Plan</button>
                     <button id="logout-btn" class="w-full text-left flex items-center gap-3 p-3 rounded-lg hover:bg-red-500/20 text-red-400 transition-colors duration-200"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></svg> Logout</button>
                 </div>
             </aside>
+            <div id="sidebar-backdrop" class="fixed inset-0 bg-black/60 z-10 hidden md:hidden"></div>
             <main class="flex-1 flex flex-col bg-gray-800 h-full">
                 <header class="flex-shrink-0 p-4 flex items-center justify-between border-b border-gray-700/50">
                     <div class="flex items-center gap-2">
@@ -289,6 +294,77 @@ HTML_CONTENT = """
             </div>
         </div>
     </template>
+    
+    <template id="template-upgrade-page">
+        <div class="w-full h-full bg-gray-900 p-4 sm:p-6 md:p-8 overflow-y-auto">
+            <header class="flex justify-between items-center mb-8">
+                <h1 class="text-3xl font-bold brand-gradient">Upgrade Your Plan</h1>
+                <button id="back-to-chat-btn" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Back to Chat</button>
+            </header>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                <div class="p-8 glassmorphism rounded-lg border-2 border-gray-600">
+                    <h2 class="text-2xl font-bold text-center text-gray-300">Free Plan</h2>
+                    <p class="text-4xl font-bold text-center my-4 text-white">Free</p>
+                    <ul class="space-y-2 text-gray-400">
+                        <li>✓ 15 Daily Messages</li>
+                        <li>✓ Standard Model Access</li>
+                        <li>✓ Community Support</li>
+                    </ul>
+                     <button class="w-full mt-6 bg-gray-600 text-white font-bold py-3 px-4 rounded-lg cursor-not-allowed">Current Plan</button>
+                </div>
+                <div class="p-8 glassmorphism rounded-lg border-2 border-indigo-500">
+                    <h2 class="text-2xl font-bold text-center text-indigo-400">Pro Plan</h2>
+                    <p class="text-4xl font-bold text-center my-4 text-white">$9.99 <span class="text-lg font-normal text-gray-400">/ month</span></p>
+                    <ul class="space-y-2 text-gray-300">
+                        <li>✓ 50 Daily Messages</li>
+                        <li>✓ Access to All Models</li>
+                        <li>✓ Priority Support</li>
+                        <li>✓ Early Access to New Features</li>
+                    </ul>
+                    <button id="purchase-pro-btn" class="w-full mt-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-90 text-white font-bold py-3 px-4 rounded-lg transition-opacity">Upgrade to Pro</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="template-privacy-policy">
+        <div class="w-full h-full bg-gray-900 p-4 sm:p-6 md:p-8 overflow-y-auto">
+             <header class="flex justify-between items-center mb-8">
+                <h1 class="text-3xl font-bold brand-gradient">Privacy Policy</h1>
+                <button id="back-to-auth-btn" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Back</button>
+            </header>
+            <div class="max-w-4xl mx-auto glassmorphism rounded-lg p-8 prose prose-invert">
+                <h2>1. Introduction</h2>
+                <p>Welcome to Myth AI. This Privacy Policy explains how we collect, use, and disclose information about you when you use our service. <strong>This is a template policy and not legal advice.</strong></p>
+                
+                <h2>2. Information We Collect</h2>
+                <p>We collect the following information:</p>
+                <ul>
+                    <li><strong>Account Information:</strong> When you create an account, we collect your username and a hashed version of your password.</li>
+                    <li><strong>Chat History:</strong> We store your conversations to provide you with a continuous chat experience.</li>
+                    <li><strong>Usage Data:</strong> We track the number of messages you send to enforce daily limits.</li>
+                </ul>
+
+                <h2>3. How We Use Your Information</h2>
+                <p>We use the information we collect to:</p>
+                <ul>
+                    <li>Provide, maintain, and improve our services.</li>
+                    <li>Manage your account and authenticate you.</li>
+                    <li>Monitor and enforce our usage policies.</li>
+                </ul>
+
+                 <h2>4. Data Sharing</h2>
+                <p>We do not share your personal information with third parties, except as required by law.</p>
+
+                <h2>5. Data Security</h2>
+                <p>We take reasonable measures to protect your information from loss, theft, misuse, and unauthorized access.</p>
+
+                <h2>6. Your Rights</h2>
+                <p>You have the right to access and delete your account and associated data. Please contact support for assistance.</p>
+            </div>
+        </div>
+    </template>
+
 
 <script>
 /****************************************************************************
@@ -411,6 +487,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 errorEl.textContent = result.error;
             }
         };
+        document.getElementById('privacy-policy-link').onclick = renderPrivacyPolicyPage;
     }
 
     async function checkLoginStatus() {
@@ -519,9 +596,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderActiveChat();
                     renderChatHistoryList();
                     // MOBILE FIX: Hide sidebar on selection
-                    const sidebar = document.getElementById('sidebar');
-                    if (sidebar && !sidebar.classList.contains('md:relative')) {
-                         sidebar.classList.add('-translate-x-full');
+                    const menuToggleBtn = document.getElementById('menu-toggle-btn');
+                    if (menuToggleBtn && menuToggleBtn.offsetParent !== null) { // Check if it's visible
+                        document.getElementById('sidebar')?.classList.add('-translate-x-full');
+                        document.getElementById('sidebar-backdrop')?.classList.add('hidden');
                     }
                 };
                 listEl.appendChild(item);
@@ -531,20 +609,22 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateUserInfo() {
         const userInfoDiv = document.getElementById('user-info');
         if (!userInfoDiv || !appState.currentUser) return;
-        const { username, plan, daily_messages, message_limit } = appState.currentUser;
+        const { username, plan } = appState.currentUser;
         const planName = plan.charAt(0).toUpperCase() + plan.slice(1);
         const planColor = plan === 'pro' ? 'text-indigo-400' : 'text-gray-400';
         const avatarColor = `hsl(${username.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % 360}, 50%, 60%)`;
         userInfoDiv.innerHTML = `
-            <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-bold text-white" style="background-color: ${avatarColor};">
-                ${username[0].toUpperCase()}
-            </div>
-            <div>
-                <div class="font-semibold">${username}</div>
-                <div class="text-xs ${planColor}">${planName} Plan</div>
+            <div class="flex items-center gap-3">
+                 <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-bold text-white" style="background-color: ${avatarColor};">
+                    ${username[0].toUpperCase()}
+                </div>
+                <div>
+                    <div class="font-semibold">${username}</div>
+                    <div class="text-xs ${planColor}">${planName} Plan</div>
+                </div>
             </div>`;
         const limitDisplay = document.getElementById('message-limit-display');
-        if(limitDisplay) limitDisplay.textContent = `Daily Messages: ${daily_messages} / ${message_limit}`;
+        if(limitDisplay) limitDisplay.textContent = `Daily Messages: ${appState.currentUser.daily_messages} / ${appState.currentUser.message_limit}`;
     }
 
     function updateUIState() {
@@ -724,8 +804,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'rename-chat-btn': handleRenameChat(); break;
                 case 'delete-chat-btn': handleDeleteChat(); break;
                 case 'export-chat-btn': handleExportChat(); break;
+                case 'upgrade-plan-btn': renderUpgradePage(); break;
+                case 'back-to-chat-btn': renderAppUI(); break;
+                case 'back-to-auth-btn': renderAuthPage(); break;
+                case 'purchase-pro-btn': handlePurchase(); break;
                 case 'menu-toggle-btn': 
                     document.getElementById('sidebar')?.classList.toggle('-translate-x-full');
+                    document.getElementById('sidebar-backdrop')?.classList.toggle('hidden');
                     break;
             }
         };
@@ -738,6 +823,14 @@ document.addEventListener('DOMContentLoaded', () => {
             userInput.oninput = () => {
                 userInput.style.height = 'auto';
                 userInput.style.height = `${userInput.scrollHeight}px`;
+            };
+        }
+        
+        const backdrop = document.getElementById('sidebar-backdrop');
+        if (backdrop) {
+            backdrop.onclick = () => {
+                document.getElementById('sidebar')?.classList.add('-translate-x-full');
+                backdrop.classList.add('hidden');
             };
         }
     }
@@ -814,6 +907,39 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
         showToast('Chat exported!', 'success');
+    }
+    
+    function renderUpgradePage() {
+        const template = document.getElementById('template-upgrade-page');
+        DOMElements.appContainer.innerHTML = '';
+        DOMElements.appContainer.appendChild(template.content.cloneNode(true));
+        setupAppEventListeners(); // Re-attach listeners for the new page
+    }
+
+    function renderPrivacyPolicyPage() {
+        const template = document.getElementById('template-privacy-policy');
+        DOMElements.appContainer.innerHTML = '';
+        DOMElements.appContainer.appendChild(template.content.cloneNode(true));
+        setupAppEventListeners(); // Re-attach listeners for the new page
+    }
+    
+    function handlePurchase() {
+        const input = document.createElement('input');
+        input.type = 'email';
+        input.className = 'w-full p-2 bg-gray-700/50 rounded-lg border border-gray-600';
+        input.placeholder = 'Enter your email to confirm';
+        openModal('Confirm Purchase', input, async () => {
+            if (input.value.includes('@')) { // Simple validation
+                const result = await apiCall('/api/user/upgrade', { method: 'POST' });
+                if (result.success) {
+                    showToast(result.message, 'success');
+                    appState.currentUser = result.user;
+                    renderAppUI(); // Go back to chat with updated plan
+                }
+            } else {
+                showToast('Please enter a valid email.', 'error');
+            }
+        }, 'Confirm Purchase');
     }
 
     function renderAdminDashboard() {
@@ -1099,6 +1225,19 @@ def set_system_prompt():
         chat['system_prompt'] = system_prompt
         return jsonify({"success": True, "message": "System prompt updated."})
     return jsonify({"error": "Chat not found or access denied."}), 404
+    
+@app.route('/api/user/upgrade', methods=['POST'])
+@login_required
+def upgrade_user_plan():
+    if current_user.plan == 'pro':
+        return jsonify({"error": "User is already on the Pro plan."}), 400
+    
+    current_user.plan = 'pro'
+    return jsonify({
+        "success": True, 
+        "message": "Congratulations! You've upgraded to the Pro Plan.",
+        "user": get_user_data_for_frontend(current_user)
+    })
 
 def admin_required(f):
     @wraps(f)
@@ -1160,4 +1299,5 @@ if __name__ == '__main__':
     initialize_database()
     # The host must be '0.0.0.0' to be accessible within Render's container
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
+
 
