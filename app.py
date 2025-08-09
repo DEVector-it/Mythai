@@ -86,6 +86,8 @@ HTML_CONTENT = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Myth AI 2.2</title>
     <meta name="description" content="An advanced, feature-rich AI chat application prototype.">
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1136294351029434"
+     crossorigin="anonymous"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.2.12/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.1/purify.min.js"></script>
@@ -1158,3 +1160,4 @@ if __name__ == '__main__':
     initialize_database()
     # The host must be '0.0.0.0' to be accessible within Render's container
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
+
