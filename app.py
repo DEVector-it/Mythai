@@ -77,6 +77,9 @@ def initialize_database():
         admin = User(id='nameadmin', username='nameadmin', password_hash=generate_password_hash(admin_pass), role='admin', plan='pro')
         DB['users']['nameadmin'] = admin
 
+# Initialize the database when the app starts
+initialize_database()
+
 # --- 5. HTML, CSS, and JavaScript Frontend ---
 HTML_CONTENT = """
 <!DOCTYPE html>
@@ -536,17 +539,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!chatWindow || !chatTitle) return;
         chatWindow.innerHTML = '';
         const chat = appState.chats[appState.activeChatId];
-        if (chat) {
+        if (chat && chat.messages.length > 0) {
             chatTitle.textContent = chat.title;
-            if (chat.messages.length > 0) {
-                chat.messages.forEach(msg => addMessageToDOM(msg));
-                renderCodeCopyButtons();
-            } else {
-                renderWelcomeScreen(chat.system_prompt);
-            }
+            chat.messages.forEach(msg => addMessageToDOM(msg));
+            renderCodeCopyButtons();
         } else {
             chatTitle.textContent = 'New Chat';
-            renderWelcomeScreen();
+            renderWelcomeScreen(chat ? chat.system_prompt : '');
         }
         updateUIState();
     }
@@ -1280,7 +1279,7 @@ def admin_toggle_plan():
 @admin_required
 def admin_delete_user():
     user_id = request.json.get('user_id')
-    if user_id == 'admin': return jsonify({"error": "Cannot delete the primary admin account."}), 400
+    if user_id == 'nameadmin': return jsonify({"error": "Cannot delete the primary admin account."}), 400
     if user_id in DB['users']:
         del DB['users'][user_id]
         chats_to_delete = [cid for cid, c in DB['chats'].items() if c['user_id'] == user_id]
@@ -1296,9 +1295,8 @@ def set_announcement():
 
 # This part is for local execution only. Gunicorn on Render will not run this.
 if __name__ == '__main__':
-    initialize_database()
     # The host must be '0.0.0.0' to be accessible within Render's container
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=Fal
 
 
 
