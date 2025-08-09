@@ -485,8 +485,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!appState.activeChatId) {
                 const chatCreated = await createNewChat(false);
                 if (!chatCreated) {
-                     showToast("Could not create chat to save prompt.", "error");
-                     return;
+                      showToast("Could not create chat to save prompt.", "error");
+                      return;
                 }
             }
             const prompt = systemPromptInput.value;
