@@ -1,6 +1,7 @@
 Flask
 Flask-Login
-Werkzeug
 gunicorn
-python-dotenv
 google-generativeai
+python-dotenv
+stripe
+werkzeug
