@@ -1,20 +1,22 @@
 import os
 import json
 import logging
-from flask import Flask, Response, request, stream_with_context, session, jsonify
+from flask import Flask, Response, request, stream_with_context, session, jsonify, redirect
 from flask_login import LoginManager, UserMixin, login_user, logout_user, current_user, login_required
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 import google.generativeai as genai
 from dotenv import load_dotenv
+import stripe
 
 # --- 1. Logging and API Configuration ---
 load_dotenv() # Loads the .env file for local development
 logging.basicConfig(level=logging.INFO)
+
+# --- Gemini API Configuration ---
 GEMINI_API_CONFIGURED = False
 try:
-    # On Render, the API key is set as an environment variable directly.
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         print("FATAL ERROR: GEMINI_API_KEY environment variable not set.")
@@ -24,11 +26,22 @@ try:
 except Exception as e:
     print(f"FATAL ERROR: Could not configure Gemini API. Details: {e}")
 
+# --- Stripe API Configuration ---
+stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
+STRIPE_PUBLIC_KEY = os.environ.get('STRIPE_PUBLIC_KEY')
+YOUR_DOMAIN = os.environ.get('YOUR_DOMAIN', 'http://localhost:5000')
+
+if not stripe.api_key:
+    print("WARNING: STRIPE_SECRET_KEY environment variable not set. Payment flow will fail.")
+if not STRIPE_PUBLIC_KEY:
+    print("WARNING: STRIPE_PUBLIC_KEY environment variable not set. Frontend may fail to initialize Stripe.")
+
 
 # --- 2. Application Setup ---
 app = Flask(__name__)
-# On Render, you should set this SECRET_KEY as an environment variable for security.
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a-very-secret-and-long-random-key-for-myth-ai-v3')
+SECRET_REGISTRATION_KEY = os.environ.get('SECRET_REGISTRATION_KEY', 'SUPER_SECRET_KEY_123')
+
 
 # --- 3. User and Session Management (Flask-Login) ---
 login_manager = LoginManager()
@@ -70,20 +83,6 @@ class User(UserMixin):
 def load_user(user_id):
     return User.get(user_id)
 
-def initialize_database():
-    if not User.get_by_username('nameadmin'):
-        # In a real app, the admin password should also be an environment variable.
-        admin_pass = os.environ.get('ADMIN_PASSWORD', 'adminadminnoob')
-        admin = User(id='nameadmin', username='nameadmin', password_hash=generate_password_hash(admin_pass), role='admin', plan='pro')
-        DB['users']['nameadmin'] = admin
-    if not User.get_by_username('adminexample'):
-        ad_pass = 'adpass'
-        advertiser = User(id='adminexample', username='adminexample', password_hash=generate_password_hash(ad_pass), role='advertiser', plan='pro')
-        DB['users']['adminexample'] = advertiser
-
-# Initialize the database when the app starts
-initialize_database()
-
 # --- 5. HTML, CSS, and JavaScript Frontend ---
 HTML_CONTENT = """
 <!DOCTYPE html>
@@ -95,6 +94,7 @@ HTML_CONTENT = """
     <meta name="description" content="An advanced, feature-rich AI chat application prototype.">
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1136294351029434"
      crossorigin="anonymous"></script>
+    <script src="https://js.stripe.com/v3/"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.2.12/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.1/purify.min.js"></script>
@@ -182,36 +182,47 @@ HTML_CONTENT = """
             </div>
              <div class="text-center mt-4 flex justify-center gap-4">
                 <button id="privacy-policy-link" class="text-xs text-gray-500 hover:text-gray-400">Privacy Policy</button>
-                <button id="ad-login-link" class="text-xs text-gray-500 hover:text-gray-400">Advertiser Login</button>
+                <button id="special-auth-link" class="text-xs text-gray-500 hover:text-gray-400">Admin & Ad Portal</button>
             </div>
         </div>
     </template>
     
-    <template id="template-ad-login-page">
+    <template id="template-special-auth-page">
         <div class="flex flex-col items-center justify-center h-full w-full bg-gray-900 p-4">
             <div class="w-full max-w-md glassmorphism rounded-2xl p-8 shadow-2xl animate-scale-up">
-                <div class="flex justify-center mb-6" id="ad-login-logo-container"></div>
-                <h2 class="text-3xl font-bold text-center text-white mb-2">Advertiser Login</h2>
-                <p class="text-gray-400 text-center mb-8">Access your advertising dashboard.</p>
-                <form id="ad-login-form">
+                <div class="flex justify-center mb-6" id="special-auth-logo-container"></div>
+                <h2 class="text-3xl font-bold text-center text-white mb-2">Special Access Signup</h2>
+                <p class="text-gray-400 text-center mb-8">Create an Admin or Advertiser account.</p>
+                <form id="special-auth-form">
                     <div class="mb-4">
-                        <label for="ad-username" class="block text-sm font-medium text-gray-300 mb-1">Username</label>
-                        <input type="text" id="ad-username" name="username" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" required>
+                        <label for="special-username" class="block text-sm font-medium text-gray-300 mb-1">Username</label>
+                        <input type="text" id="special-username" name="username" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="special-password" class="block text-sm font-medium text-gray-300 mb-1">Password</label>
+                        <input type="password" id="special-password" name="password" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="secret-key" class="block text-sm font-medium text-gray-300 mb-1">Secret Key</label>
+                        <input type="password" id="secret-key" name="secret_key" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" required>
                     </div>
                     <div class="mb-6">
-                        <label for="ad-password" class="block text-sm font-medium text-gray-300 mb-1">Password</label>
-                        <input type="password" id="ad-password" name="password" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" required>
+                        <label for="role-select" class="block text-sm font-medium text-gray-300 mb-1">Account Type</label>
+                        <select id="role-select" name="role" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600">
+                            <option value="admin">Admin</option>
+                            <option value="advertiser">Advertiser</option>
+                        </select>
                     </div>
-                    <button type="submit" class="w-full bg-gradient-to-r from-green-600 to-teal-600 hover:opacity-90 text-white font-bold py-3 px-4 rounded-lg transition-opacity">Login</button>
-                    <p id="ad-login-error" class="text-red-400 text-sm text-center h-4 mt-3"></p>
+                    <button type="submit" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 text-white font-bold py-3 px-4 rounded-lg">Create Account</button>
+                    <p id="special-auth-error" class="text-red-400 text-sm text-center h-4 mt-3"></p>
                 </form>
             </div>
-             <div class="text-center mt-4">
+            <div class="text-center mt-4">
                 <button id="back-to-main-login" class="text-xs text-gray-500 hover:text-gray-400">Back to Main Login</button>
             </div>
         </div>
     </template>
-    
+
     <template id="template-ad-dashboard">
         <div class="w-full h-full bg-gray-900 p-4 sm:p-6 md:p-8 overflow-y-auto">
             <header class="flex justify-between items-center mb-8">
@@ -535,29 +546,29 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
         document.getElementById('privacy-policy-link').onclick = renderPrivacyPolicyPage;
-        document.getElementById('ad-login-link').onclick = renderAdLoginPage;
+        document.getElementById('special-auth-link').onclick = renderSpecialAuthPage;
     }
     
-    function renderAdLoginPage() {
-        const template = document.getElementById('template-ad-login-page');
+    function renderSpecialAuthPage() {
+        const template = document.getElementById('template-special-auth-page');
         DOMElements.appContainer.innerHTML = '';
         DOMElements.appContainer.appendChild(template.content.cloneNode(true));
-        renderLogo('ad-login-logo-container');
+        renderLogo('special-auth-logo-container');
         document.getElementById('back-to-main-login').onclick = () => renderAuthPage(true);
-        const form = document.getElementById('ad-login-form');
+        const form = document.getElementById('special-auth-form');
         form.onsubmit = async (e) => {
             e.preventDefault();
-            const errorEl = document.getElementById('ad-login-error');
+            const errorEl = document.getElementById('special-auth-error');
             errorEl.textContent = '';
             const formData = new FormData(form);
             const data = Object.fromEntries(formData.entries());
-            const result = await apiCall('/api/ad_login', {
+            const result = await apiCall('/api/special_signup', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             });
             if (result.success) {
-                initializeApp(result.user, {}, {}); // No chats/settings for advertisers for now
+                initializeApp(result.user, {}, {}); // No chats/settings for new special accounts
             } else {
                 errorEl.textContent = result.error;
             }
@@ -565,6 +576,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function checkLoginStatus() {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('payment') === 'success') {
+            showToast('Upgrade successful! Welcome to the Pro Plan.', 'success');
+        } else if (urlParams.get('payment') === 'cancel') {
+            showToast('Payment was cancelled. You are still on the Free Plan.', 'info');
+        }
+
         const result = await apiCall('/api/status');
         if (result.success && result.logged_in) {
             initializeApp(result.user, result.chats, result.settings);
@@ -996,23 +1014,29 @@ document.addEventListener('DOMContentLoaded', () => {
         setupAppEventListeners(); // Re-attach listeners for the new page
     }
     
-    function handlePurchase() {
-        const input = document.createElement('input');
-        input.type = 'email';
-        input.className = 'w-full p-2 bg-gray-700/50 rounded-lg border border-gray-600';
-        input.placeholder = 'Enter your email to confirm';
-        openModal('Confirm Purchase', input, async () => {
-            if (input.value.includes('@')) { // Simple validation
-                const result = await apiCall('/api/user/upgrade', { method: 'POST' });
-                if (result.success) {
-                    showToast(result.message, 'success');
-                    appState.currentUser = result.user;
-                    renderAppUI(); // Go back to chat with updated plan
-                }
-            } else {
-                showToast('Please enter a valid email.', 'error');
+    async function handlePurchase() {
+        try {
+            const config = await apiCall('/api/config');
+            if (!config.success || !config.stripe_public_key) {
+                throw new Error("Could not retrieve payment configuration.");
             }
-        }, 'Confirm Purchase');
+            const stripe = Stripe(config.stripe_public_key);
+            
+            const sessionResult = await apiCall('/api/create-checkout-session', { method: 'POST' });
+            if (!sessionResult.success) {
+                throw new Error(sessionResult.error || "Could not create payment session.");
+            }
+            
+            const { error } = await stripe.redirectToCheckout({
+                sessionId: sessionResult.id
+            });
+            
+            if (error) {
+                showToast(error.message, 'error');
+            }
+        } catch (error) {
+            showToast(error.message, 'error');
+        }
     }
 
     function renderAdminDashboard() {
@@ -1146,6 +1170,10 @@ def get_all_user_chats(user_id):
 def index():
     return Response(HTML_CONTENT, mimetype='text/html')
 
+@app.route('/api/config')
+def get_config():
+    return jsonify({"stripe_public_key": STRIPE_PUBLIC_KEY})
+
 @app.route('/api/signup', methods=['POST'])
 def signup():
     data = request.get_json()
@@ -1161,32 +1189,47 @@ def signup():
         "success": True, "user": get_user_data_for_frontend(new_user),
         "chats": {}, "settings": DB['site_settings']
     })
+    
+@app.route('/api/special_signup', methods=['POST'])
+def special_signup():
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    secret_key = data.get('secret_key')
+    role = data.get('role')
+
+    if secret_key != SECRET_REGISTRATION_KEY:
+        return jsonify({"error": "Invalid secret key."}), 403
+        
+    if role not in ['admin', 'advertiser']:
+        return jsonify({"error": "Invalid role specified."}), 400
+
+    if not username or not password:
+        return jsonify({"error": "Username and password are required."}), 400
+    if User.get_by_username(username):
+        return jsonify({"error": "Username already exists."}), 409
+
+    new_user = User(id=username, username=username, password_hash=generate_password_hash(password), role=role, plan='pro')
+    DB['users'][new_user.id] = new_user
+    login_user(new_user, remember=True)
+    return jsonify({
+        "success": True, 
+        "user": get_user_data_for_frontend(new_user)
+    })
 
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.get_json()
     username, password = data.get('username'), data.get('password')
     user = User.get_by_username(username)
-    if user and user.role != 'advertiser' and check_password_hash(user.password_hash, password):
+    if user and check_password_hash(user.password_hash, password):
         login_user(user, remember=True)
         return jsonify({
             "success": True, "user": get_user_data_for_frontend(user),
-            "chats": get_all_user_chats(user.id), "settings": DB['site_settings']
+            "chats": get_all_user_chats(user.id) if user.role == 'user' else {}, 
+            "settings": DB['site_settings']
         })
     return jsonify({"error": "Invalid username or password."}), 401
-    
-@app.route('/api/ad_login', methods=['POST'])
-def ad_login():
-    data = request.get_json()
-    username, password = data.get('username'), data.get('password')
-    user = User.get_by_username(username)
-    if user and user.role == 'advertiser' and check_password_hash(user.password_hash, password):
-        login_user(user, remember=True)
-        return jsonify({
-            "success": True, 
-            "user": get_user_data_for_frontend(user)
-        })
-    return jsonify({"error": "Invalid advertiser credentials."}), 401
 
 @app.route('/api/logout')
 def logout():
@@ -1198,7 +1241,8 @@ def status():
     if current_user.is_authenticated:
         return jsonify({
             "logged_in": True, "user": get_user_data_for_frontend(current_user),
-            "chats": get_all_user_chats(current_user.id), "settings": DB['site_settings']
+            "chats": get_all_user_chats(current_user.id) if current_user.role == 'user' else {}, 
+            "settings": DB['site_settings']
         })
     return jsonify({"logged_in": False})
 
@@ -1318,19 +1362,44 @@ def set_system_prompt():
         chat['system_prompt'] = system_prompt
         return jsonify({"success": True, "message": "System prompt updated."})
     return jsonify({"error": "Chat not found or access denied."}), 404
-    
-@app.route('/api/user/upgrade', methods=['POST'])
+
+@app.route('/api/create-checkout-session', methods=['POST'])
 @login_required
-def upgrade_user_plan():
-    if current_user.plan == 'pro':
-        return jsonify({"error": "User is already on the Pro plan."}), 400
-    
+def create_checkout_session():
+    if not stripe.api_key:
+        return jsonify(error={'message': 'Payment services are currently unavailable.'}), 500
+    try:
+        checkout_session = stripe.checkout.Session.create(
+            line_items=[
+                {
+                    'price_data': {
+                        'currency': 'usd',
+                        'product_data': {
+                            'name': 'Myth AI Pro Plan',
+                        },
+                        'unit_amount': 999, # $9.99
+                    },
+                    'quantity': 1,
+                },
+            ],
+            mode='payment',
+            success_url=YOUR_DOMAIN + '/payment-success',
+            cancel_url=YOUR_DOMAIN + '/payment-cancel',
+        )
+        return jsonify({'id': checkout_session.id})
+    except Exception as e:
+        return jsonify(error=str(e)), 403
+
+@app.route('/payment-success')
+@login_required
+def payment_success():
     current_user.plan = 'pro'
-    return jsonify({
-        "success": True, 
-        "message": "Congratulations! You've upgraded to the Pro Plan.",
-        "user": get_user_data_for_frontend(current_user)
-    })
+    return redirect('/?payment=success')
+
+@app.route('/payment-cancel')
+@login_required
+def payment_cancel():
+    return redirect('/?payment=cancel')
 
 def admin_required(f):
     @wraps(f)
