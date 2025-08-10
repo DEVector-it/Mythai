@@ -286,6 +286,8 @@ HTML_CONTENT = """
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1136294351029434"
+     crossorigin="anonymous"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -402,6 +404,7 @@ HTML_CONTENT = """
                  <button id="teacher-signup-link" class="text-xs text-gray-500 hover:text-gray-400">Teacher Sign Up</button>
                  <button id="special-auth-link" class="text-xs text-gray-500 hover:text-gray-400">Admin Portal</button>
              </div>
+             <p class="text-xs text-gray-600 mt-8">Made by DeVector</p>
         </div>
     </template>
     
@@ -556,7 +559,7 @@ HTML_CONTENT = """
             </div>
         </div>
     </template>
-   
+    
     <template id="template-admin-dashboard">
         <div class="w-full h-full bg-gray-900 p-4 sm:p-6 md:p-8 overflow-y-auto">
             <header class="flex flex-wrap justify-between items-center gap-4 mb-8">
@@ -600,7 +603,7 @@ HTML_CONTENT = """
             </div>
         </div>
     </template>
-   
+    
     <template id="template-modal">
         <div class="modal-backdrop fixed inset-0 bg-black/60 animate-fade-in"></div>
         <div class="modal-content fixed inset-0 flex items-center justify-center p-4">
@@ -611,7 +614,7 @@ HTML_CONTENT = """
             </div>
         </div>
     </template>
-   
+    
     <template id="template-welcome-screen">
        <div class="flex flex-col items-center justify-center h-full text-center p-4 animate-fade-in">
            <div class="w-24 h-24 mb-6" id="welcome-logo-container"></div>
@@ -921,8 +924,8 @@ HTML_CONTENT = """
                 const data = Object.fromEntries(formData.entries());
                 
                 if (!isLogin && (!data.email || !data.email.includes('@'))) {
-                     errorEl.textContent = 'A valid email is required to sign up.';
-                     return;
+                    errorEl.textContent = 'A valid email is required to sign up.';
+                    return;
                 }
                 
                 const endpoint = isLogin ? '/api/login' : '/api/signup';
@@ -1658,7 +1661,7 @@ def check_and_reset_daily_limit(user):
                 if (datetime.now().date() - last_streak_date.date()).days > 1:
                     user.streak = 0
             except (ValueError, TypeError):
-                 user.streak = 0
+                user.streak = 0
         save_database()
 
 def get_user_data_for_frontend(user):
