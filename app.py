@@ -1197,12 +1197,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- EVENT LISTENERS & HANDLERS ---
     function setupAppEventListeners() {
-        // Use event delegation on the app container for most clicks
-        DOMElements.appContainer.addEventListener('click', (e) => {
+        const appContainer = DOMElements.appContainer;
+
+        // Main delegated click handler using .onclick for robustness
+        appContainer.onclick = (e) => {
             const target = e.target.closest('button');
             if (!target) return;
 
-            // Handle buttons inside the main app layout
+            // Handle buttons by ID
             switch (target.id) {
                 case 'new-chat-btn': createNewChat(true); break;
                 case 'logout-btn': handleLogout(); break;
@@ -1224,50 +1226,51 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'back-to-main-login': renderAuthPage(true); break;
             }
 
-            // Handle dynamically created buttons
+            // Handle buttons by class
             if (target.classList.contains('delete-user-btn')) {
                 handleAdminDeleteUser(e);
             }
             if (target.classList.contains('purchase-btn') && !target.disabled) {
                 handlePurchase(target.dataset.planid);
             }
-        });
+        };
 
+        // Specific handlers for non-button elements or complex events
         const userInput = document.getElementById('user-input');
         if (userInput) {
-            userInput.addEventListener('keydown', (e) => { 
+            userInput.onkeydown = (e) => { 
                 if (e.key === 'Enter' && !e.shiftKey) { 
                     e.preventDefault(); 
                     handleSendMessage(); 
                 } 
-            });
-            userInput.addEventListener('input', () => { 
+            };
+            userInput.oninput = () => { 
                 userInput.style.height = 'auto'; 
                 userInput.style.height = `${userInput.scrollHeight}px`; 
-            });
+            };
         }
         
         const backdrop = document.getElementById('sidebar-backdrop');
         if (backdrop) {
-            backdrop.addEventListener('click', () => {
+            backdrop.onclick = () => {
                 document.getElementById('sidebar')?.classList.add('-translate-x-full');
                 backdrop.classList.add('hidden');
-            });
+            };
         }
 
         const fileInput = document.getElementById('file-input');
         if (fileInput) {
-            fileInput.addEventListener('change', (e) => {
+            fileInput.onchange = (e) => {
                 if (e.target.files.length > 0) {
                     appState.uploadedFile = e.target.files[0];
                     updatePreviewContainer();
                 }
-            });
+            };
         }
         
         const announcementForm = document.getElementById('announcement-form');
         if(announcementForm) {
-            announcementForm.addEventListener('submit', handleSetAnnouncement);
+            announcementForm.onsubmit = handleSetAnnouncement;
         }
     }
 
@@ -2039,5 +2042,4 @@ def impersonate_user():
 # --- Main Execution ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
-
 
