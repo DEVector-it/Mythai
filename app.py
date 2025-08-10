@@ -21,7 +21,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # --- Application Setup ---
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a-very-secret-and-long-random-key-for-myth-ai-v10-oauth')
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a-very-secret-and-long-random-key-for-myth-ai-v11-teacher')
 DATABASE_FILE = 'database.json'
 
 # --- Site & API Configuration ---
@@ -35,6 +35,7 @@ SITE_CONFIG = {
     "YOUR_DOMAIN": os.environ.get('YOUR_DOMAIN', 'http://localhost:5000'),
     "SECRET_REGISTRATION_KEY": os.environ.get('SECRET_REGISTRATION_KEY', 'SUPER_SECRET_KEY_123'),
     "SECRET_STUDENT_KEY": os.environ.get('SECRET_STUDENT_KEY', 'STUDENT_SECRET_KEY_789'),
+    "SECRET_TEACHER_KEY": os.environ.get('SECRET_TEACHER_KEY', 'TEACHER_SECRET_KEY_456'),
     "GOOGLE_CLIENT_ID": os.environ.get("GOOGLE_CLIENT_ID"),
     "GOOGLE_CLIENT_SECRET": os.environ.get("GOOGLE_CLIENT_SECRET"),
 }
@@ -73,7 +74,7 @@ if not stripe.api_key:
 
 
 # --- 2. Database Management ---
-DB = { "users": {}, "chats": {}, "site_settings": {"announcement": "Welcome! Student signup is now available on a separate page."}, "ads": {} }
+DB = { "users": {}, "chats": {}, "site_settings": {"announcement": "Welcome! Student and Teacher signups are now available."}, "ads": {} }
 
 def save_database():
     """Saves the in-memory DB to a JSON file atomically."""
@@ -118,15 +119,16 @@ def unauthorized():
     return jsonify({"error": "Login required.", "logged_in": False}), 401
 
 class User(UserMixin):
-    def __init__(self, id, username, password_hash, role='user', plan='free', account_type='general', daily_messages=0, last_message_date=None):
+    def __init__(self, id, username, password_hash, role='user', plan='free', account_type='general', daily_messages=0, last_message_date=None, teacher_code=None):
         self.id = id
         self.username = username
         self.password_hash = password_hash
         self.role = role
         self.plan = plan
-        self.account_type = account_type # 'general' or 'student'
+        self.account_type = account_type # 'general', 'student', or 'teacher'
         self.daily_messages = daily_messages
         self.last_message_date = last_message_date or datetime.now().strftime("%Y-%m-%d")
+        self.teacher_code = teacher_code # For students, this links to a teacher's username
 
     @staticmethod
     def get(user_id):
@@ -147,7 +149,8 @@ def user_to_dict(user):
     return {
         'id': user.id, 'username': user.username, 'password_hash': user.password_hash,
         'role': user.role, 'plan': user.plan, 'account_type': user.account_type,
-        'daily_messages': user.daily_messages, 'last_message_date': user.last_message_date
+        'daily_messages': user.daily_messages, 'last_message_date': user.last_message_date,
+        'teacher_code': user.teacher_code
     }
 
 @login_manager.user_loader
@@ -198,6 +201,15 @@ def admin_required(f):
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated or current_user.role != 'admin':
             return jsonify({"error": "Administrator access required."}), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+def teacher_required(f):
+    @wraps(f)
+    @login_required
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or current_user.account_type != 'teacher':
+            return jsonify({"error": "Teacher access required."}), 403
         return f(*args, **kwargs)
     return decorated_function
 
