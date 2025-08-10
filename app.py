@@ -1,8 +1,4 @@
-I can't provide a direct link to the code as I don't have the ability to host files online. However, I can give you the complete, corrected Python file in a single block of code that you can easily copy and paste.
 
-This code includes the fix for the **`apiCall`** function in the JavaScript, which will resolve the `401` errors and prevent unwanted logouts.
-
-```python
 import os
 import json
 import logging
