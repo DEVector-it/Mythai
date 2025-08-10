@@ -636,22 +636,11 @@ document.addEventListener('DOMContentLoaded', () => {
         DOMElements.appContainer.appendChild(template.content.cloneNode(true));
         renderLogo('auth-logo-container');
         
-        const signupFields = document.getElementById('signup-fields');
-        if (isLogin) {
-            document.getElementById('auth-title').textContent = 'Welcome Back';
-            document.getElementById('auth-subtitle').textContent = 'Sign in to continue to Myth AI.';
-            document.getElementById('auth-submit-btn').textContent = 'Login';
-            document.getElementById('auth-toggle-btn').textContent = "Don't have an account? Sign Up";
-            signupFields.classList.add('hidden');
-        } else {
-            document.getElementById('auth-title').textContent = 'Create Account';
-            document.getElementById('auth-subtitle').textContent = 'Join Myth AI to get started.';
-            document.getElementById('auth-submit-btn').textContent = 'Sign Up';
-            document.getElementById('auth-toggle-btn').textContent = 'Already have an account? Login';
-            signupFields.classList.remove('hidden');
-        }
+        document.getElementById('auth-toggle-btn').onclick = () => {
+            // Simple signup is for general users
+            renderAuthPage(false);
+        };
 
-        document.getElementById('auth-toggle-btn').onclick = () => renderAuthPage(!isLogin);
         document.getElementById('auth-form').onsubmit = async (e) => {
             e.preventDefault();
             const form = e.target;
@@ -659,20 +648,27 @@ document.addEventListener('DOMContentLoaded', () => {
             errorEl.textContent = '';
             const formData = new FormData(form);
             const data = Object.fromEntries(formData.entries());
-            const endpoint = isLogin ? '/api/login' : '/api/signup';
+            
+            // Determine if this is a login or general signup
+            const isLoginForm = document.getElementById('auth-submit-btn').textContent === 'Login';
+            const endpoint = isLoginForm ? '/api/login' : '/api/signup';
             
             const result = await apiCall(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             });
+
             if (result.success) {
                 initializeApp(result.user, result.chats, result.settings);
             } else {
                 errorEl.textContent = result.error;
             }
         };
+
+        document.getElementById('student-signup-link').onclick = renderStudentSignupPage;
         document.getElementById('special-auth-link').onclick = renderSpecialAuthPage;
+        document.getElementById('privacy-policy-link').onclick = renderPrivacyPolicyPage;
     }
     
     function renderSpecialAuthPage() {
@@ -695,6 +691,35 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (result.success) {
                 initializeApp(result.user, {}, {});
+            } else {
+                errorEl.textContent = result.error;
+            }
+        };
+    }
+
+    function renderStudentSignupPage() {
+        const template = document.getElementById('template-student-signup-page');
+        DOMElements.appContainer.innerHTML = '';
+        DOMElements.appContainer.appendChild(template.content.cloneNode(true));
+        renderLogo('student-signup-logo-container');
+        document.getElementById('back-to-main-login').onclick = () => renderAuthPage(true);
+        
+        document.getElementById('student-signup-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const errorEl = document.getElementById('student-signup-error');
+            errorEl.textContent = '';
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+            
+            const result = await apiCall('/api/student_signup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+
+            if (result.success) {
+                initializeApp(result.user, result.chats, result.settings);
             } else {
                 errorEl.textContent = result.error;
             }
@@ -1747,3 +1772,4 @@ def impersonate_user():
 # --- Main Execution ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
+
