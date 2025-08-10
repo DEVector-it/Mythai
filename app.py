@@ -1,13 +1,14 @@
-
 import os
 import json
 import logging
 import base64
 import time
+import uuid
+import secrets
 from io import BytesIO
 from flask import Flask, Response, request, stream_with_context, session, jsonify, redirect, url_for
 from flask_login import LoginManager, UserMixin, login_user, logout_user, current_user, login_required
-from datetime import datetime
+from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 import google.generativeai as genai
@@ -20,7 +21,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # --- Security Check for Essential Keys ---
-REQUIRED_KEYS = ['SECRET_KEY', 'GEMINI_API_KEY', 'SECRET_REGISTRATION_KEY', 'SECRET_STUDENT_KEY', 'SECRET_TEACHER_KEY']
+REQUIRED_KEYS = ['SECRET_KEY', 'GEMINI_API_KEY', 'SECRET_REGISTRATION_KEY', 'SECRET_STUDENT_KEY', 'SECRET_TEACHER_KEY', 'STRIPE_WEBHOOK_SECRET']
 for key in REQUIRED_KEYS:
     if not os.environ.get(key):
         logging.critical(f"CRITICAL ERROR: Environment variable '{key}' is not set. Application cannot start securely.")
@@ -43,6 +44,7 @@ SITE_CONFIG = {
     "SECRET_REGISTRATION_KEY": os.environ.get('SECRET_REGISTRATION_KEY'),
     "SECRET_STUDENT_KEY": os.environ.get('SECRET_STUDENT_KEY'),
     "SECRET_TEACHER_KEY": os.environ.get('SECRET_TEACHER_KEY'),
+    "STRIPE_WEBHOOK_SECRET": os.environ.get('STRIPE_WEBHOOK_SECRET')
 }
 
 # --- API Initialization ---
@@ -59,7 +61,7 @@ if not stripe.api_key:
 
 
 # --- 2. Database Management ---
-DB = { "users": {}, "chats": {}, "site_settings": {"announcement": "Welcome! Student and Teacher signups are now available."} }
+DB = { "users": {}, "chats": {}, "classrooms": {}, "site_settings": {"announcement": "Welcome! Student and Teacher signups are now available."} }
 
 def save_database():
     """Saves the entire in-memory DB to a JSON file atomically."""
@@ -69,6 +71,7 @@ def save_database():
             serializable_db = {
                 "users": {uid: user_to_dict(u) for uid, u in DB['users'].items()},
                 "chats": DB['chats'],
+                "classrooms": DB['classrooms'],
                 "site_settings": DB['site_settings'],
             }
             json.dump(serializable_db, f, indent=4)
@@ -88,6 +91,7 @@ def load_database():
             data = json.load(f)
             DB['chats'] = data.get('chats', {})
             DB['site_settings'] = data.get('site_settings', {"announcement": ""})
+            DB['classrooms'] = data.get('classrooms', {})
             DB['users'] = {uid: User.from_dict(u_data) for uid, u_data in data.get('users', {}).items()}
     except (json.JSONDecodeError, FileNotFoundError) as e:
         logging.error(f"Could not load database file. Starting fresh. Error: {e}")
@@ -102,16 +106,18 @@ def unauthorized():
     return jsonify({"error": "Login required.", "logged_in": False}), 401
 
 class User(UserMixin):
-    def __init__(self, id, username, password_hash, role='user', plan='free', account_type='general', daily_messages=0, last_message_date=None, teacher_code=None):
+    def __init__(self, id, username, password_hash, role='user', plan='free', account_type='general', daily_messages=0, last_message_date=None, classroom_code=None, streak=0, last_streak_date=None):
         self.id = id
         self.username = username
         self.password_hash = password_hash
         self.role = role
         self.plan = plan
-        self.account_type = account_type # 'general', 'student', or 'teacher'
+        self.account_type = account_type
         self.daily_messages = daily_messages
         self.last_message_date = last_message_date or datetime.now().strftime("%Y-%m-%d")
-        self.teacher_code = teacher_code # For students, this links to a teacher's username
+        self.classroom_code = classroom_code
+        self.streak = streak
+        self.last_streak_date = last_streak_date or datetime.now().strftime("%Y-%m-%d")
 
     @staticmethod
     def get(user_id):
@@ -133,7 +139,8 @@ def user_to_dict(user):
         'id': user.id, 'username': user.username, 'password_hash': user.password_hash,
         'role': user.role, 'plan': user.plan, 'account_type': user.account_type,
         'daily_messages': user.daily_messages, 'last_message_date': user.last_message_date,
-        'teacher_code': user.teacher_code
+        'classroom_code': user.classroom_code, 'streak': user.streak,
+        'last_streak_date': user.last_streak_date
     }
 
 @login_manager.user_loader
@@ -158,14 +165,12 @@ with app.app_context():
 
 
 # --- 4. Plan & Rate Limiting Configuration ---
-# Centralized plan configuration
 PLAN_CONFIG = {
-    "free": {"name": "Free", "price_string": "Free", "features": ["15 Daily Messages", "Standard Model Access"], "color": "text-gray-300", "message_limit": 15, "can_upload": False, "model": "gemini-1.5-flash-latest"},
+    "free": {"name": "Free", "price_string": "Free", "features": ["15 Daily Messages", "Standard Model Access", "No Image Uploads"], "color": "text-gray-300", "message_limit": 15, "can_upload": False, "model": "gemini-1.5-flash-latest"},
     "pro": {"name": "Pro", "price_string": "$9.99 / month", "features": ["50 Daily Messages", "Image Uploads", "Priority Support"], "color": "text-indigo-400", "message_limit": 50, "can_upload": True, "model": "gemini-1.5-pro-latest"},
     "ultra": {"name": "Ultra", "price_string": "$100 one-time", "features": ["Unlimited Messages", "Image Uploads", "Access to All Models"], "color": "text-purple-400", "message_limit": 10000, "can_upload": True, "model": "gemini-1.5-pro-latest"},
-    "student": {"name": "Student", "price_string": "$4.99 / month", "features": ["100 Daily Messages", "Image Uploads", "Study Buddy Persona"], "color": "text-green-400", "message_limit": 100, "can_upload": True, "model": "gemini-1.5-flash-latest"}
+    "student": {"name": "Student", "price_string": "$4.99 / month", "features": ["100 Daily Messages", "Image Uploads", "Study Buddy Persona", "Streak & Leaderboard"], "color": "text-green-400", "message_limit": 100, "can_upload": True, "model": "gemini-1.5-flash-latest"}
 }
-
 
 # Simple in-memory rate limiting
 rate_limit_store = {}
@@ -336,8 +341,8 @@ HTML_CONTENT = """
                         <input type="password" id="student-password" name="password" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" required>
                     </div>
                     <div class="mb-6">
-                        <label for="student-secret-key" class="block text-sm font-medium text-gray-300 mb-1">Student Access Key</label>
-                        <input type="password" id="student-secret-key" name="secret_key" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" required>
+                        <label for="student-classroom-code" class="block text-sm font-medium text-gray-300 mb-1">Classroom Code</label>
+                        <input type="text" id="student-classroom-code" name="classroom_code" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" required>
                     </div>
                     <button type="submit" class="w-full bg-gradient-to-r from-green-500 to-teal-500 hover:opacity-90 text-white font-bold py-3 px-4 rounded-lg">Create Student Account</button>
                     <p id="student-signup-error" class="text-red-400 text-sm text-center h-4 mt-3"></p>
@@ -546,25 +551,70 @@ HTML_CONTENT = """
     
     <template id="template-teacher-dashboard">
         <div class="w-full h-full bg-gray-900 p-4 sm:p-6 md:p-8 overflow-y-auto">
-            <header class="flex justify-between items-center mb-8">
+            <header class="flex flex-wrap justify-between items-center gap-4 mb-8">
                 <h1 class="text-3xl font-bold brand-gradient">Teacher Dashboard</h1>
-                <button id="teacher-logout-btn" class="bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded-lg transition-colors">Logout</button>
+                <div class="flex items-center gap-2">
+                    <button id="teacher-gen-code-btn" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded-lg transition-colors">Generate New Classroom Code</button>
+                    <button id="teacher-logout-btn" class="bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded-lg transition-colors">Logout</button>
+                </div>
             </header>
-            <div class="max-w-4xl mx-auto glassmorphism rounded-lg p-8">
-                <h2 class="text-2xl font-bold text-white mb-4">Welcome, Teacher!</h2>
-                <p class="text-gray-300">This dashboard is under development. Soon you will be able to view your students' progress here.</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="glassmorphism rounded-lg p-6">
+                    <h2 class="text-xl font-bold text-white mb-2">My Classroom</h2>
+                    <p class="text-gray-400 mb-4">Share this code with your students so they can join your class.</p>
+                    <p class="text-lg font-mono text-green-400 bg-gray-800 p-3 rounded-lg flex items-center justify-between">
+                        <span id="teacher-classroom-code">Loading...</span>
+                        <button id="copy-code-btn" class="text-gray-400 hover:text-white transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        </button>
+                    </p>
+                </div>
+                <div class="glassmorphism rounded-lg p-6">
+                    <h2 class="text-xl font-bold text-white mb-4">Class Leaderboard</h2>
+                    <div id="teacher-leaderboard" class="space-y-2">
+                        <p class="text-gray-400">No students in your class yet.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glassmorphism rounded-lg p-6 mt-8">
+                <h2 class="text-xl font-bold text-white mb-4">Student Activity</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead class="border-b border-gray-600">
+                            <tr>
+                                <th class="p-2">Student</th>
+                                <th class="p-2">Plan</th>
+                                <th class="p-2">Daily Messages</th>
+                                <th class="p-2">Streak</th>
+                                <th class="p-2">Last Active</th>
+                                <th class="p-2">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="teacher-student-list"></tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="glassmorphism rounded-lg p-6 mt-8">
+                <h2 class="text-xl font-bold text-white mb-4">Student Chats</h2>
+                <div id="teacher-student-chats" class="space-y-4">
+                    <p class="text-gray-400">Select a student to view their chats.</p>
+                </div>
             </div>
         </div>
     </template>
+
     <script>
 /****************************************************************************
- * JAVASCRIPT FRONTEND LOGIC (MYTH AI V7 - SECURE & STABLE)
+ * JAVASCRIPT FRONTEND LOGIC (MYTH AI V8 - TEACHER FEATURES)
  ****************************************************************************/
 document.addEventListener('DOMContentLoaded', () => {
     const appState = {
         chats: {}, activeChatId: null, isAITyping: false,
         abortController: null, currentUser: null,
         isStudyMode: false, uploadedFile: null,
+        teacherData: { classroom: null, students: [] },
     };
 
     const DOMElements = {
@@ -595,7 +645,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function apiCall(endpoint, options = {}) {
         try {
-            // FIX: Add credentials to fetch options to send cookies with requests
             const response = await fetch(endpoint, {
                 ...options,
                 credentials: 'include'
@@ -603,7 +652,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = response.headers.get("Content-Type")?.includes("application/json") ? await response.json() : null;
             
             if (!response.ok) {
-                // If a 401 occurs, force a frontend logout
                 if (response.status === 401) handleLogout(false);
                 throw new Error(data?.error || `Server error: ${response.statusText}`);
             }
@@ -656,7 +704,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('auth-subtitle').textContent = isLogin ? 'Sign in to continue to Myth AI.' : 'Create a new general account.';
         document.getElementById('auth-submit-btn').textContent = isLogin ? 'Login' : 'Sign Up';
         document.getElementById('auth-toggle-btn').textContent = isLogin ? "Don't have an account? Sign Up" : "Already have an account? Login";
-
 
         document.getElementById('auth-toggle-btn').onclick = () => renderAuthPage(!isLogin);
         document.getElementById('student-signup-link').onclick = renderStudentSignupPage;
@@ -824,6 +871,14 @@ document.addEventListener('DOMContentLoaded', () => {
         updateUserInfo();
         setupAppEventListeners();
         renderStudyModeToggle();
+        
+        // Show streaks for students
+        if (appState.currentUser.account_type === 'student') {
+            const streakElement = document.createElement('div');
+            streakElement.className = 'flex items-center gap-2 p-3 text-sm text-yellow-300';
+            streakElement.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18v-6h.01"/><path d="M10 16a2 2 0 1 1 4 0 2 2 0 0 1-4 0z"/></svg> Streak: ${appState.currentUser.streak} days`;
+            document.getElementById('user-info').appendChild(streakElement);
+        }
     }
 
     function renderActiveChat() {
@@ -1059,14 +1114,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 showToast("Could not start a new chat session.", "error");
                 return;
             }
-            renderActiveChat(); // Update UI after new chat is created
+            renderActiveChat();
         }
         
         if (appState.chats[appState.activeChatId]?.messages.length === 0) {
             document.getElementById('chat-window').innerHTML = '';
         }
 
-        addMessageToDOM({ sender: 'user', content: prompt });
+        const userMessage = { sender: 'user', content: prompt };
+        addMessageToDOM(userMessage);
+
+        const aiMessage = { sender: 'model', content: '' };
+        const aiContentEl = addMessageToDOM(aiMessage, true).querySelector('.message-content');
+
         userInput.value = '';
         userInput.style.height = 'auto';
         
@@ -1077,9 +1137,6 @@ document.addEventListener('DOMContentLoaded', () => {
         appState.isAITyping = true;
         appState.abortController = new AbortController();
         updateUIState();
-
-        const aiMessage = { sender: 'model', content: '' };
-        const aiContentEl = addMessageToDOM(aiMessage, true).querySelector('.message-content');
 
         try {
             const formData = new FormData();
@@ -1116,7 +1173,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if(chatWindow) chatWindow.scrollTop = chatWindow.scrollHeight;
             }
             
-            // Handle case of empty response from Gemini API
             if (!fullResponse.trim()) {
                 fullResponse = "I'm sorry, I couldn't generate a response. Please try again.";
             }
@@ -1204,80 +1260,103 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- EVENT LISTENERS & HANDLERS ---
     function setupAppEventListeners() {
         const appContainer = DOMElements.appContainer;
+        
+        const removeListeners = () => {
+            appContainer.onclick = null;
+            document.getElementById('user-input').onkeydown = null;
+            document.getElementById('user-input').oninput = null;
+            document.getElementById('sidebar-backdrop').onclick = null;
+            document.getElementById('file-input').onchange = null;
+            const announcementForm = document.getElementById('announcement-form');
+            if(announcementForm) announcementForm.onsubmit = null;
+        };
 
-        // Main delegated click handler using .onclick for robustness
-        appContainer.onclick = (e) => {
-            const target = e.target.closest('button');
-            if (!target) return;
+        const addListeners = () => {
+            // Main delegated click handler using .onclick for robustness
+            appContainer.onclick = (e) => {
+                const target = e.target.closest('button');
+                if (!target) return;
 
-            // Handle buttons by ID
-            switch (target.id) {
-                case 'new-chat-btn': createNewChat(true); break;
-                case 'logout-btn': handleLogout(); break;
-                case 'teacher-logout-btn': handleLogout(); break;
-                case 'admin-logout-btn': handleLogout(); break;
-                case 'send-btn': handleSendMessage(); break;
-                case 'stop-generating-btn': appState.abortController?.abort(); break;
-                case 'rename-chat-btn': handleRenameChat(); break;
-                case 'delete-chat-btn': handleDeleteChat(); break;
-                case 'share-chat-btn': handleShareChat(); break;
-                case 'upgrade-plan-btn': renderUpgradePage(); break;
-                case 'back-to-chat-btn': renderAppUI(); break;
-                case 'upload-btn': document.getElementById('file-input')?.click(); break;
-                case 'menu-toggle-btn': 
-                    document.getElementById('sidebar')?.classList.toggle('-translate-x-full');
-                    document.getElementById('sidebar-backdrop')?.classList.toggle('hidden');
-                    break;
-                case 'admin-impersonate-btn': handleImpersonate(); break;
-                case 'back-to-main-login': renderAuthPage(true); break;
+                // Handle buttons by ID
+                switch (target.id) {
+                    case 'new-chat-btn': createNewChat(true); break;
+                    case 'logout-btn': handleLogout(); break;
+                    case 'teacher-logout-btn': handleLogout(); break;
+                    case 'admin-logout-btn': handleLogout(); break;
+                    case 'send-btn': handleSendMessage(); break;
+                    case 'stop-generating-btn': appState.abortController?.abort(); break;
+                    case 'rename-chat-btn': handleRenameChat(); break;
+                    case 'delete-chat-btn': handleDeleteChat(); break;
+                    case 'share-chat-btn': handleShareChat(); break;
+                    case 'upgrade-plan-btn': renderUpgradePage(); break;
+                    case 'back-to-chat-btn': renderAppUI(); break;
+                    case 'upload-btn': document.getElementById('file-input')?.click(); break;
+                    case 'menu-toggle-btn': 
+                        document.getElementById('sidebar')?.classList.toggle('-translate-x-full');
+                        document.getElementById('sidebar-backdrop')?.classList.toggle('hidden');
+                        break;
+                    case 'admin-impersonate-btn': handleImpersonate(); break;
+                    case 'back-to-main-login': renderAuthPage(true); break;
+                    case 'teacher-gen-code-btn': handleGenerateClassroomCode(); break;
+                    case 'copy-code-btn': handleCopyClassroomCode(); break;
+                }
+
+                // Handle buttons by class
+                if (target.classList.contains('delete-user-btn')) {
+                    handleAdminDeleteUser(e);
+                }
+                if (target.classList.contains('purchase-btn') && !target.disabled) {
+                    handlePurchase(target.dataset.planid);
+                }
+                if (target.classList.contains('view-student-chats-btn')) {
+                    handleViewStudentChats(e.target.dataset.userid);
+                }
+                if (target.classList.contains('kick-student-btn')) {
+                    handleKickStudent(e.target.dataset.userid);
+                }
+            };
+
+            // Specific handlers for non-button elements or complex events
+            const userInput = document.getElementById('user-input');
+            if (userInput) {
+                userInput.onkeydown = (e) => { 
+                    if (e.key === 'Enter' && !e.shiftKey) { 
+                        e.preventDefault(); 
+                        handleSendMessage(); 
+                    } 
+                };
+                userInput.oninput = () => { 
+                    userInput.style.height = 'auto'; 
+                    userInput.style.height = `${userInput.scrollHeight}px`; 
+                };
+            }
+            
+            const backdrop = document.getElementById('sidebar-backdrop');
+            if (backdrop) {
+                backdrop.onclick = () => {
+                    document.getElementById('sidebar')?.classList.add('-translate-x-full');
+                    backdrop.classList.add('hidden');
+                };
             }
 
-            // Handle buttons by class
-            if (target.classList.contains('delete-user-btn')) {
-                handleAdminDeleteUser(e);
+            const fileInput = document.getElementById('file-input');
+            if (fileInput) {
+                fileInput.onchange = (e) => {
+                    if (e.target.files.length > 0) {
+                        appState.uploadedFile = e.target.files[0];
+                        updatePreviewContainer();
+                    }
+                };
             }
-            if (target.classList.contains('purchase-btn') && !target.disabled) {
-                handlePurchase(target.dataset.planid);
+            
+            const announcementForm = document.getElementById('announcement-form');
+            if(announcementForm) {
+                announcementForm.onsubmit = handleSetAnnouncement;
             }
         };
 
-        // Specific handlers for non-button elements or complex events
-        const userInput = document.getElementById('user-input');
-        if (userInput) {
-            userInput.onkeydown = (e) => { 
-                if (e.key === 'Enter' && !e.shiftKey) { 
-                    e.preventDefault(); 
-                    handleSendMessage(); 
-                } 
-            };
-            userInput.oninput = () => { 
-                userInput.style.height = 'auto'; 
-                userInput.style.height = `${userInput.scrollHeight}px`; 
-            };
-        }
-        
-        const backdrop = document.getElementById('sidebar-backdrop');
-        if (backdrop) {
-            backdrop.onclick = () => {
-                document.getElementById('sidebar')?.classList.add('-translate-x-full');
-                backdrop.classList.add('hidden');
-            };
-        }
-
-        const fileInput = document.getElementById('file-input');
-        if (fileInput) {
-            fileInput.onchange = (e) => {
-                if (e.target.files.length > 0) {
-                    appState.uploadedFile = e.target.files[0];
-                    updatePreviewContainer();
-                }
-            };
-        }
-        
-        const announcementForm = document.getElementById('announcement-form');
-        if(announcementForm) {
-            announcementForm.onsubmit = handleSetAnnouncement;
-        }
+        removeListeners();
+        addListeners();
     }
 
     async function handleLogout(doApiCall = true) {
@@ -1357,7 +1436,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const template = document.getElementById('template-upgrade-page');
         DOMElements.appContainer.innerHTML = '';
         DOMElements.appContainer.appendChild(template.content.cloneNode(true));
-        setupAppEventListeners(); // Re-attach listeners for the new view
+        setupAppEventListeners();
 
         const plansContainer = document.getElementById('plans-container');
         const plansResult = await apiCall('/api/plans');
@@ -1422,11 +1501,13 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchAdminData();
     }
 
-    function renderTeacherDashboard() {
+    async function renderTeacherDashboard() {
         const template = document.getElementById('template-teacher-dashboard');
         DOMElements.appContainer.innerHTML = '';
         DOMElements.appContainer.appendChild(template.content.cloneNode(true));
+        renderLogo('app-logo-container');
         setupAppEventListeners();
+        await fetchTeacherData();
     }
 
     async function fetchAdminData() {
@@ -1455,6 +1536,111 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
+    async function fetchTeacherData() {
+        const data = await apiCall('/api/teacher/dashboard_data');
+        if (!data.success) return;
+
+        const { classroom, students } = data;
+        appState.teacherData.classroom = classroom;
+        appState.teacherData.students = students;
+
+        const classroomCodeEl = document.getElementById('teacher-classroom-code');
+        if (classroomCodeEl) {
+            classroomCodeEl.textContent = classroom.code || 'None';
+        }
+        
+        const studentListEl = document.getElementById('teacher-student-list');
+        if (studentListEl) {
+            studentListEl.innerHTML = '';
+            students.forEach(student => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-gray-700/50';
+                tr.innerHTML = `
+                    <td class="p-2">${student.username}</td>
+                    <td class="p-2">${student.plan}</td>
+                    <td class="p-2">${student.daily_messages}/${student.message_limit}</td>
+                    <td class="p-2">${student.streak} days</td>
+                    <td class="p-2">${student.last_message_date}</td>
+                    <td class="p-2 flex gap-2">
+                        <button data-userid="${student.id}" class="view-student-chats-btn text-xs px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white">View Chats</button>
+                        <button data-userid="${student.id}" class="kick-student-btn text-xs px-2 py-1 rounded bg-red-600 hover:bg-red-500 text-white">Kick</button>
+                    </td>
+                `;
+                studentListEl.appendChild(tr);
+            });
+        }
+
+        const leaderboardEl = document.getElementById('teacher-leaderboard');
+        if (leaderboardEl) {
+            if (students.length > 0) {
+                const sortedStudents = [...students].sort((a, b) => b.streak - a.streak);
+                leaderboardEl.innerHTML = `
+                    <ul class="space-y-2">
+                        ${sortedStudents.map((s, i) => `<li class="flex items-center justify-between text-sm text-gray-300"><span>${i + 1}. ${s.username}</span><span class="font-bold text-yellow-400">${s.streak} days</span></li>`).join('')}
+                    </ul>
+                `;
+            } else {
+                leaderboardEl.innerHTML = `<p class="text-gray-400">No students in your class yet.</p>`;
+            }
+        }
+    }
+    
+    async function handleGenerateClassroomCode() {
+        const result = await apiCall('/api/teacher/generate_classroom_code', { method: 'POST' });
+        if (result.success) {
+            showToast('New classroom code generated!', 'success');
+            await fetchTeacherData();
+        }
+    }
+
+    function handleCopyClassroomCode() {
+        const code = document.getElementById('teacher-classroom-code').textContent;
+        if (code && code !== 'None' && code !== 'Loading...') {
+            navigator.clipboard.writeText(code);
+            showToast('Classroom code copied to clipboard!', 'success');
+        }
+    }
+
+    async function handleViewStudentChats(studentId) {
+        const result = await apiCall(`/api/teacher/student_chats/${studentId}`);
+        if (result.success) {
+            const chatsContainer = document.getElementById('teacher-student-chats');
+            chatsContainer.innerHTML = '';
+            if (result.chats.length > 0) {
+                result.chats.forEach(chat => {
+                    const chatEl = document.createElement('div');
+                    chatEl.className = 'bg-gray-800 p-4 rounded-lg border border-gray-700 space-y-4';
+                    chatEl.innerHTML = `<h3 class="text-lg font-bold">${chat.title}</h3>`;
+                    chat.messages.forEach(msg => {
+                        chatEl.innerHTML += `
+                            <div class="p-2 rounded-lg ${msg.sender === 'user' ? 'bg-blue-900/30' : 'bg-gray-700/30'}">
+                                <strong>${msg.sender === 'user' ? 'Student' : 'AI'}:</strong> ${msg.content}
+                            </div>
+                        `;
+                    });
+                    chatsContainer.appendChild(chatEl);
+                });
+            } else {
+                chatsContainer.innerHTML = '<p class="text-gray-400">This student has no chat history yet.</p>';
+            }
+        }
+    }
+
+    async function handleKickStudent(studentId) {
+        if (confirm("Are you sure you want to kick this student from your classroom?")) {
+            const result = await apiCall('/api/teacher/kick_student', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ student_id: studentId }),
+            });
+            if (result.success) {
+                showToast(result.message, 'success');
+                await fetchTeacherData();
+            }
+        }
+    }
+
+    // --- ADMIN ROUTES ---
     async function handleSetAnnouncement(e) {
         e.preventDefault();
         const text = document.getElementById('announcement-input').value;
@@ -1484,7 +1670,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }).then(result => {
                 if (result.success) {
                     showToast(result.message, 'success');
-                    fetchAdminData(); // Refresh the list
+                    fetchAdminData();
                 }
             });
         }
@@ -1504,7 +1690,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-
     // --- INITIAL LOAD ---
     checkLoginStatus();
 });
@@ -1520,22 +1705,40 @@ def check_and_reset_daily_limit(user):
     if user.last_message_date != today_str:
         user.last_message_date = today_str
         user.daily_messages = 0
-        save_database() # Save change immediately
+        
+        # Check and update student streak
+        if user.account_type == 'student':
+            last_streak_date = datetime.strptime(user.last_streak_date, "%Y-%m-%d")
+            # If a day has passed since the last message, the streak is reset
+            if (datetime.now() - last_streak_date).days > 1:
+                user.streak = 0
+
+        save_database()
 
 def get_user_data_for_frontend(user):
     """Prepares user data for sending to the frontend."""
     if not user: return {}
     check_and_reset_daily_limit(user)
     plan_details = PLAN_CONFIG.get(user.plan, PLAN_CONFIG['free'])
-    return {
+    
+    data = {
         "id": user.id, "username": user.username, "role": user.role, "plan": user.plan,
         "account_type": user.account_type, "daily_messages": user.daily_messages,
         "message_limit": plan_details["message_limit"], "can_upload": plan_details["can_upload"],
+        "is_student_in_class": user.account_type == 'student' and user.classroom_code is not None,
+        "streak": user.streak,
     }
+    return data
 
 def get_all_user_chats(user_id):
     """Retrieves all chats belonging to a specific user."""
     return {chat_id: chat_data for chat_id, chat_data in DB['chats'].items() if chat_data.get('user_id') == user_id}
+
+def generate_unique_classroom_code():
+    while True:
+        code = secrets.token_hex(4).upper()
+        if code not in DB['classrooms']:
+            return code
 
 
 # --- 8. Core API Routes (Auth, Status) ---
@@ -1555,7 +1758,7 @@ def signup():
     
     username = data.get('username', '').strip()
     password = data.get('password', '')
-    account_type = 'general' # General signup is always general
+    account_type = 'general'
 
     if not all([username, password]) or len(username) < 3 or len(password) < 6:
         return jsonify({"error": "Username (min 3 chars) and password (min 6 chars) are required."}), 400
@@ -1584,6 +1787,7 @@ def student_signup():
     username = data.get('username', '').strip()
     password = data.get('password', '')
     secret_key = data.get('secret_key')
+    classroom_code = data.get('classroom_code', '').strip().upper()
 
     if secret_key != SITE_CONFIG["SECRET_STUDENT_KEY"]:
         return jsonify({"error": "Invalid student access key."}), 403
@@ -1592,9 +1796,13 @@ def student_signup():
     if User.get_by_username(username):
         return jsonify({"error": "Username already exists."}), 409
     
+    if classroom_code not in DB['classrooms']:
+        return jsonify({"error": "Invalid classroom code."}), 403
+
     try:
-        new_user = User(id=username, username=username, password_hash=generate_password_hash(password), account_type='student', plan='student')
+        new_user = User(id=username, username=username, password_hash=generate_password_hash(password), account_type='student', plan='student', classroom_code=classroom_code)
         DB['users'][new_user.id] = new_user
+        DB['classrooms'][classroom_code]['students'].append(new_user.id)
         save_database()
         login_user(new_user, remember=True)
         return jsonify({
@@ -1647,7 +1855,7 @@ def login():
         login_user(user, remember=True)
         return jsonify({
             "success": True, "user": get_user_data_for_frontend(user),
-            "chats": get_all_user_chats(user.id) if user.role != 'admin' else {},
+            "chats": get_all_user_chats(user.id) if user.role not in ['admin', 'teacher'] else {},
             "settings": DB['site_settings']
         })
     return jsonify({"error": "Invalid username or password."}), 401
@@ -1671,7 +1879,7 @@ def status():
     if current_user.is_authenticated:
         return jsonify({
             "logged_in": True, "user": get_user_data_for_frontend(current_user),
-            "chats": get_all_user_chats(current_user.id) if current_user.role != 'admin' else {},
+            "chats": get_all_user_chats(current_user.id) if current_user.role not in ['admin', 'teacher'] else {},
             "settings": DB['site_settings']
         })
     return jsonify({"logged_in": False})
@@ -1763,12 +1971,22 @@ def chat_api():
         if not model_input_parts:
             return jsonify({"error": "A prompt or file is required."}), 400
 
-        # === FIX: SAVE USER MESSAGE AND UPDATE COUNT *BEFORE* THE API CALL ===
-        chat['messages'].append({'sender': 'user', 'content': prompt})
+        # Save user message and update count
+        user_message_content = {
+            'sender': 'user', 'content': prompt,
+            'image_url': f"data:{uploaded_file.mimetype};base64,{img_base64}" if uploaded_file else None
+        }
+        chat['messages'].append(user_message_content)
         current_user.daily_messages += 1
-        save_database() # Save the user's prompt immediately
+        
+        # Update streak if in study mode and not already done today
+        if is_study_mode and current_user.account_type == 'student' and current_user.last_streak_date != datetime.now().strftime("%Y-%m-%d"):
+            current_user.streak += 1
+            current_user.last_streak_date = datetime.now().strftime("%Y-%m-%d")
+        
+        save_database()
 
-        # --- Gemini API Call ---
+        # Gemini API Call
         model = genai.GenerativeModel(plan_details['model'], system_instruction=final_system_instruction)
         chat_session = model.start_chat(history=history)
 
@@ -1785,7 +2003,6 @@ def chat_api():
                 yield json.dumps({"error": f"An error occurred with the AI model: {str(e)}"})
                 return
 
-            # === FIX: SAVE AI RESPONSE AND TITLE *AFTER* THE STREAM ===
             if not full_response_text.strip():
                 logging.info(f"Received an empty response for chat {chat_id}.")
                 full_response_text = "I'm sorry, I couldn't generate a response. Please try again."
@@ -1876,7 +2093,6 @@ def view_shared_chat(chat_id):
     chat_html = f"<html><head><title>{chat['title']}</title></head><body><h1>{chat['title']}</h1>"
     for msg in chat['messages']:
         sender = "<b>You:</b>" if msg['sender'] == 'user' else "<b>Myth AI:</b>"
-        # Basic escaping for content, though it's already sanitized by DOMPurify on the frontend
         content = msg['content'].replace('<', '&lt;').replace('>', '&gt;')
         chat_html += f"<p>{sender} {content.replace('/n', '<br>')}</p><hr>"
     chat_html += "</body></html>"
@@ -1885,7 +2101,6 @@ def view_shared_chat(chat_id):
 @app.route('/api/plans')
 @login_required
 def get_plans():
-    # Return a subset of PLAN_CONFIG for the frontend
     plans_for_frontend = {
         plan_id: {
             "name": details["name"],
@@ -1940,24 +2155,16 @@ def stripe_webhook():
             payload, sig_header, endpoint_secret
         )
     except ValueError as e:
-        # Invalid payload
         return 'Invalid payload', 400
     except stripe.error.SignatureVerificationError as e:
-        # Invalid signature
         return 'Invalid signature', 400
 
-    # Handle the checkout.session.completed event
     if event['type'] == 'checkout.session.completed':
         session = event['data']['object']
         client_reference_id = session.get('client_reference_id')
         user = User.get(client_reference_id)
 
         if user:
-            # Logic to determine which plan was purchased
-            # This is a simplified example. A real app would inspect the line items.
-            # For now, we'll assume the plan is stored in metadata or determined from the price ID.
-            # This part needs to be robust in a real application.
-            # A simple approach:
             line_item = session.list_line_items(session.id, limit=1).data[0]
             price_id = line_item.price.id
             
@@ -2011,7 +2218,6 @@ def admin_delete_user():
     if not user_to_delete:
         return jsonify({"error": "User not found."}), 404
 
-    # Prevent deleting the last admin
     admin_users = [u for u in DB['users'].values() if u.role == 'admin']
     if user_to_delete.role == 'admin' and len(admin_users) <= 1:
         return jsonify({"error": "Cannot delete the last admin account."}), 403
@@ -2047,7 +2253,108 @@ def impersonate_user():
     return jsonify({"success": True, "message": f"Now impersonating {username}"})
 
 
+# --- 12. Teacher Routes ---
+@app.route('/api/teacher/dashboard_data', methods=['GET'])
+@teacher_required
+def teacher_dashboard_data():
+    teacher_id = current_user.id
+    classroom_code = None
+    
+    # Find the classroom code associated with the teacher
+    for code, classroom in DB['classrooms'].items():
+        if classroom.get('teacher_id') == teacher_id:
+            classroom_code = code
+            break
+            
+    if not classroom_code:
+        return jsonify({"success": True, "classroom": {"code": None, "students": []}, "students": []})
+        
+    classroom_students_ids = DB['classrooms'][classroom_code]['students']
+    students_data = []
+    for student_id in classroom_students_ids:
+        student = User.get(student_id)
+        if student:
+            students_data.append(get_user_data_for_frontend(student))
+            
+    return jsonify({
+        "success": True,
+        "classroom": {
+            "code": classroom_code,
+            "students": students_data
+        },
+        "students": students_data
+    })
+
+@app.route('/api/teacher/generate_classroom_code', methods=['POST'])
+@teacher_required
+def generate_classroom_code_api():
+    teacher_id = current_user.id
+    
+    # Check if a classroom already exists for this teacher
+    existing_classroom_code = next((code for code, data in DB['classrooms'].items() if data['teacher_id'] == teacher_id), None)
+    if existing_classroom_code:
+        return jsonify({"error": "You already have a classroom. You can only have one."}), 409
+        
+    new_code = generate_unique_classroom_code()
+    DB['classrooms'][new_code] = {
+        "teacher_id": teacher_id,
+        "students": [],
+        "created_at": datetime.now().isoformat()
+    }
+    save_database()
+    return jsonify({"success": True, "code": new_code, "message": "New classroom code generated."})
+
+@app.route('/api/teacher/kick_student', methods=['POST'])
+@teacher_required
+def kick_student():
+    student_id = request.json.get('student_id')
+    student = User.get(student_id)
+    
+    if not student or student.account_type != 'student':
+        return jsonify({"error": "Student not found."}), 404
+        
+    if student.classroom_code is None or DB['classrooms'].get(student.classroom_code, {}).get('teacher_id') != current_user.id:
+        return jsonify({"error": "Unauthorized to kick this student."}), 403
+        
+    DB['classrooms'][student.classroom_code]['students'].remove(student.id)
+    student.classroom_code = None
+    student.streak = 0
+    save_database()
+    
+    return jsonify({"success": True, "message": f"Student {student.username} has been kicked."})
+
+@app.route('/api/teacher/student_chats/<student_id>', methods=['GET'])
+@teacher_required
+def get_student_chats(student_id):
+    student = User.get(student_id)
+    
+    if not student or student.account_type != 'student':
+        return jsonify({"error": "Student not found."}), 404
+        
+    if student.classroom_code is None or DB['classrooms'].get(student.classroom_code, {}).get('teacher_id') != current_user.id:
+        return jsonify({"error": "Unauthorized to view this student's chats."}), 403
+        
+    student_chats = list(get_all_user_chats(student_id).values())
+    
+    # We only send a simplified version of the chats to the frontend for display
+    sanitized_chats = []
+    for chat in student_chats:
+        sanitized_messages = []
+        for msg in chat['messages']:
+            # We don't want to expose raw images in a public-facing API for now
+            # so we only send the text content
+            sanitized_messages.append({
+                "sender": msg['sender'],
+                "content": msg['content']
+            })
+        sanitized_chats.append({
+            "title": chat['title'],
+            "messages": sanitized_messages,
+        })
+        
+    return jsonify({"success": True, "chats": sanitized_chats})
+
+
 # --- Main Execution ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
-    
