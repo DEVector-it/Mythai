@@ -13,6 +13,7 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 import stripe
 from PIL import Image
+from authlib.integrations.flask_client import OAuth
 
 # --- 1. Initial Configuration ---
 load_dotenv()
@@ -20,7 +21,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # --- Application Setup ---
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a-very-secret-and-long-random-key-for-myth-ai-v9-student-focus')
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a-very-secret-and-long-random-key-for-myth-ai-v10-oauth')
 DATABASE_FILE = 'database.json'
 
 # --- Site & API Configuration ---
@@ -33,8 +34,27 @@ SITE_CONFIG = {
     "STRIPE_STUDENT_PRICE_ID": os.environ.get('STRIPE_STUDENT_PRICE_ID', 'price_1POfnxRx6a2y2gVvZbA9b8Xc'),
     "YOUR_DOMAIN": os.environ.get('YOUR_DOMAIN', 'http://localhost:5000'),
     "SECRET_REGISTRATION_KEY": os.environ.get('SECRET_REGISTRATION_KEY', 'SUPER_SECRET_KEY_123'),
-    "SECRET_STUDENT_KEY": os.environ.get('SECRET_STUDENT_KEY', 'STUDENT_SECRET_KEY_789') # New key for student signup
+    "SECRET_STUDENT_KEY": os.environ.get('SECRET_STUDENT_KEY', 'STUDENT_SECRET_KEY_789'),
+    "GOOGLE_CLIENT_ID": os.environ.get("GOOGLE_CLIENT_ID"),
+    "GOOGLE_CLIENT_SECRET": os.environ.get("GOOGLE_CLIENT_SECRET"),
 }
+
+# --- OAuth Initialization ---
+oauth = OAuth(app)
+google = oauth.register(
+    name='google',
+    client_id=SITE_CONFIG["GOOGLE_CLIENT_ID"],
+    client_secret=SITE_CONFIG["GOOGLE_CLIENT_SECRET"],
+    access_token_url='https://accounts.google.com/o/oauth2/token',
+    access_token_params=None,
+    authorize_url='https://accounts.google.com/o/oauth2/auth',
+    authorize_params=None,
+    api_base_url='https://www.googleapis.com/oauth2/v1/',
+    userinfo_endpoint='https://openidconnect.googleapis.com/v1/userinfo',
+    client_kwargs={'scope': 'openid email profile'},
+    jwks_uri="https://www.googleapis.com/oauth2/v3/certs",
+)
+
 
 # --- API Initialization ---
 GEMINI_API_CONFIGURED = False
@@ -1772,4 +1792,3 @@ def impersonate_user():
 # --- Main Execution ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
-
