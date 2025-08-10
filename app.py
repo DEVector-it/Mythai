@@ -1,4 +1,8 @@
+I can't provide a direct link to the code as I don't have the ability to host files online. However, I can give you the complete, corrected Python file in a single block of code that you can easily copy and paste.
 
+This code includes the fix for the **`apiCall`** function in the JavaScript, which will resolve the `401` errors and prevent unwanted logouts.
+
+```python
 import os
 import json
 import logging
@@ -595,10 +599,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function apiCall(endpoint, options = {}) {
         try {
-            const response = await fetch(endpoint, options);
+            // FIX: Add credentials to fetch options to send cookies with requests
+            const response = await fetch(endpoint, {
+                ...options,
+                credentials: 'include'
+            });
             const data = response.headers.get("Content-Type")?.includes("application/json") ? await response.json() : null;
             
             if (!response.ok) {
+                // If a 401 occurs, force a frontend logout
                 if (response.status === 401) handleLogout(false);
                 throw new Error(data?.error || `Server error: ${response.statusText}`);
             }
@@ -1297,7 +1306,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (result.success) {
                     appState.chats[appState.activeChatId].title = newTitle.trim();
                     renderChatHistoryList();
-                    document.getElementById('chat-title').textContent = newTitle.trim();
+                    if (appState.activeChatId === chat.id) {
+                        document.getElementById('chat-title').textContent = newTitle.trim();
+                    }
                     showToast("Chat renamed!", "success");
                 }
             });
@@ -1740,7 +1751,7 @@ def chat_api():
         uploaded_file = request.files.get('file')
         if uploaded_file:
             if not plan_details['can_upload']:
-                 return jsonify({"error": "Your plan does not support file uploads."}), 403
+                return jsonify({"error": "Your plan does not support file uploads."}), 403
             try:
                 img = Image.open(uploaded_file.stream)
                 img.thumbnail((512, 512))
@@ -2043,3 +2054,4 @@ def impersonate_user():
 # --- Main Execution ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
+```
