@@ -297,7 +297,7 @@ PLAN_CONFIG = {
     "free": {"name": "Free", "price_string": "Free", "features": ["15 Daily Messages", "Standard Model Access", "No Image Uploads"], "color": "text-gray-300", "message_limit": 15, "can_upload": False, "model": "gemini-1.5-flash-latest", "can_tts": False},
     "pro": {"name": "Pro", "price_string": "$9.99 / month", "features": ["50 Daily Messages", "Image Uploads", "Priority Support", "Voice Chat"], "color": "text-indigo-400", "message_limit": 50, "can_upload": True, "model": "gemini-1.5-pro-latest", "can_tts": True},
     "ultra": {"name": "Ultra", "price_string": "$100 one-time", "features": ["Unlimited Messages", "Image Uploads", "Access to All Models", "Voice Chat"], "color": "text-purple-400", "message_limit": 10000, "can_upload": True, "model": "gemini-1.5-pro-latest", "can_tts": True},
-    "student": {"name": "Student", "price_string": "$4.99 / month", "features": ["100 Daily Messages", "Image Uploads", "Study Buddy Persona", "Streak & Leaderboard"], "color": "text-amber-400", "message_limit": 100, "can_upload": True, "model": "gemini-1.5-flash-latest", "can_tts": False}
+    "student": {"name": "Student", "price_string": "$4.99 / month", "features": ["100 Daily Messages", "Image Uploads", "Study Buddy Persona", "Streak & Leaderboard"], "color": "text-amber-400", "message_limit": 100, "can_upload": False, "model": "gemini-1.5-flash-latest", "can_tts": False}
 }
 
 rate_limit_store = {}
@@ -352,6 +352,7 @@ HTML_CONTENT = """
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <!-- THEME CHANGE: Added AdSense Script -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1136294351029434"
      crossorigin="anonymous"></script>
     <script>
@@ -370,18 +371,20 @@ HTML_CONTENT = """
         }
     </script>
     <style>
-        body { background-color: #111827; transition: background-color 0.5s ease; }
+        /* THEME CHANGE: Updated to a purple-grayish theme */
+        body { background-color: #1e293b; transition: background-color 0.5s ease; } /* slate-800 */
         ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #1f2937; }
-        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 10px; }
-        .glassmorphism { background: rgba(31, 41, 55, 0.5); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
-        .brand-gradient { background-image: linear-gradient(to right, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        ::-webkit-scrollbar-track { background: #0f172a; } /* slate-900 */
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; } /* slate-600 */
+        .glassmorphism { background: rgba(30, 41, 59, 0.5); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); } /* slate-800 with opacity */
+        .brand-gradient { background-image: linear-gradient(to right, #7c3aed, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; } /* purple-600 to violet-400 */
         .message-wrapper { animation: fadeIn 0.4s ease-out forwards; }
         pre { position: relative; }
-        .copy-code-btn { position: absolute; top: 0.5rem; right: 0.5rem; background-color: #374151; color: white; border: none; padding: 0.25rem 0.5rem; border-radius: 0.25rem; cursor: pointer; opacity: 0; transition: opacity 0.2s; font-size: 0.75rem; }
+        .copy-code-btn { position: absolute; top: 0.5rem; right: 0.5rem; background-color: #334155; color: white; border: none; padding: 0.25rem 0.5rem; border-radius: 0.25rem; cursor: pointer; opacity: 0; transition: opacity 0.2s; font-size: 0.75rem; } /* slate-700 */
         pre:hover .copy-code-btn { opacity: 1; }
         #sidebar.hidden { transform: translateX(-100%); }
-        /* Study Buddy Theme */
+        
+        /* THEME CHANGE: Updated Study Buddy Theme to yellow/orange */
         .study-buddy-mode { background-color: #432500; color: #ffedd5; }
         .study-buddy-mode #sidebar { background: rgba(30, 16, 0, 0.7); color: #fed7aa; }
         .study-buddy-mode #chat-window { color: #fed7aa; }
@@ -395,7 +398,8 @@ HTML_CONTENT = """
         .study-buddy-mode ::-webkit-scrollbar-track { background: #78350f; }
         .study-buddy-mode ::-webkit-scrollbar-thumb { background: #b45309; }
         .study-buddy-mode #sidebar button:hover { background-color: rgba(245, 158, 11, 0.3); }
-        .study-buddy-mode #sidebar .bg-blue-600\\/30 { background-color: rgba(234, 88, 12, 0.4); }
+        .study-buddy-mode #sidebar .bg-purple-600\\/30 { background-color: rgba(234, 88, 12, 0.4); } /* Updated active chat color for study mode */
+
         .typing-indicator span { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: currentColor; margin: 0 2px; animation: typing-bounce 1.4s infinite ease-in-out both; }
         .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
         .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
@@ -412,8 +416,8 @@ HTML_CONTENT = """
         <svg width="48" height="48" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
             <defs>
                 <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style="stop-color:#3b82f6;" />
-                    <stop offset="100%" style="stop-color:#8b5cf6;" />
+                    <stop offset="0%" style="stop-color:#7c3aed;" />
+                    <stop offset="100%" style="stop-color:#a78bfa;" />
                 </linearGradient>
             </defs>
             <path d="M50 10 C 27.9 10 10 27.9 10 50 C 10 72.1 27.9 90 50 90 C 72.1 90 90 72.1 90 50 C 90 27.9 72.1 10 50 10 Z M 50 15 C 69.3 15 85 30.7 85 50 C 85 69.3 69.3 85 50 85 C 30.7 85 15 69.3 15 50 C 15 30.7 30.7 15 50 15 Z" fill="url(#logoGradient)"/>
@@ -422,7 +426,7 @@ HTML_CONTENT = """
     </template>
 
     <template id="template-auth-page">
-        <div class="flex flex-col items-center justify-center h-full w-full bg-gray-900 p-4">
+        <div class="flex flex-col items-center justify-center h-full w-full bg-slate-900 p-4">
             <div class="w-full max-w-md glassmorphism rounded-2xl p-8 shadow-2xl animate-scale-up">
                 <div class="flex justify-center mb-6" id="auth-logo-container"></div>
                 <h2 class="text-3xl font-bold text-center text-white mb-2" id="auth-title">Welcome Back</h2>
@@ -431,28 +435,28 @@ HTML_CONTENT = """
                 <form id="auth-form">
                     <div id="email-field-container" class="hidden mb-4">
                         <label for="email" class="block text-sm font-medium text-gray-300 mb-1">Email</label>
-                        <input type="email" id="email" name="email" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+                        <input type="email" id="email" name="email" class="w-full p-3 bg-slate-700/50 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all">
                     </div>
                     <div class="mb-4">
                         <label for="username" class="block text-sm font-medium text-gray-300 mb-1">Username</label>
-                        <input type="text" id="username" name="username" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" required>
+                        <input type="text" id="username" name="username" class="w-full p-3 bg-slate-700/50 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all" required>
                     </div>
                     <div class="mb-4">
                         <label for="password" class="block text-sm font-medium text-gray-300 mb-1">Password</label>
-                        <input type="password" id="password" name="password" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" required>
+                        <input type="password" id="password" name="password" class="w-full p-3 bg-slate-700/50 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all" required>
                     </div>
                     <div class="flex justify-end mb-6">
-                        <button type="button" id="forgot-password-link" class="text-xs text-blue-400 hover:text-blue-300 hidden">Forgot Password?</button>
+                        <button type="button" id="forgot-password-link" class="text-xs text-violet-400 hover:text-violet-300 hidden">Forgot Password?</button>
                     </div>
-                    <button type="submit" id="auth-submit-btn" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-90 text-white font-bold py-3 px-4 rounded-lg transition-opacity">Login</button>
+                    <button type="submit" id="auth-submit-btn" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 text-white font-bold py-3 px-4 rounded-lg transition-opacity">Login</button>
                     <p id="auth-error" class="text-red-400 text-sm text-center h-4 mt-3"></p>
                 </form>
 
                 <div id="google-auth-container" class="hidden">
                     <div class="relative flex py-5 items-center">
-                        <div class="flex-grow border-t border-gray-600"></div>
+                        <div class="flex-grow border-t border-slate-600"></div>
                         <span class="flex-shrink mx-4 text-gray-400 text-xs">OR</span>
-                        <div class="flex-grow border-t border-gray-600"></div>
+                        <div class="flex-grow border-t border-slate-600"></div>
                     </div>
 
                     <a href="/api/login/google" class="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-200 text-gray-800 font-bold py-3 px-4 rounded-lg transition-colors">
@@ -462,7 +466,7 @@ HTML_CONTENT = """
                 </div>
 
                 <div class="text-center mt-6">
-                    <button id="auth-toggle-btn" class="text-sm text-blue-400 hover:text-blue-300">Don't have an account? Sign Up</button>
+                    <button id="auth-toggle-btn" class="text-sm text-violet-400 hover:text-violet-300">Don't have an account? Sign Up</button>
                 </div>
             </div>
              <div class="text-center mt-4 flex justify-center gap-4">
@@ -475,7 +479,7 @@ HTML_CONTENT = """
     </template>
     
     <template id="template-reset-password-page">
-        <div class="flex flex-col items-center justify-center h-full w-full bg-gray-900 p-4">
+        <div class="flex flex-col items-center justify-center h-full w-full bg-slate-900 p-4">
             <div class="w-full max-w-md glassmorphism rounded-2xl p-8 shadow-2xl animate-scale-up">
                 <div class="flex justify-center mb-6" id="reset-logo-container"></div>
                 <h2 class="text-3xl font-bold text-center text-white mb-2">Reset Your Password</h2>
@@ -483,9 +487,9 @@ HTML_CONTENT = """
                 <form id="reset-password-form">
                     <div class="mb-4">
                         <label for="new-password" class="block text-sm font-medium text-gray-300 mb-1">New Password</label>
-                        <input type="password" id="new-password" name="password" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" required>
+                        <input type="password" id="new-password" name="password" class="w-full p-3 bg-slate-700/50 rounded-lg border border-slate-600" required>
                     </div>
-                    <button type="submit" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-90 text-white font-bold py-3 px-4 rounded-lg">Set New Password</button>
+                    <button type="submit" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 text-white font-bold py-3 px-4 rounded-lg">Set New Password</button>
                     <p id="reset-error" class="text-red-400 text-sm text-center h-4 mt-3"></p>
                 </form>
             </div>
@@ -493,7 +497,7 @@ HTML_CONTENT = """
     </template>
     
     <template id="template-student-signup-page">
-        <div class="flex flex-col items-center justify-center h-full w-full bg-gray-900 p-4">
+        <div class="flex flex-col items-center justify-center h-full w-full bg-slate-900 p-4">
             <div class="w-full max-w-md glassmorphism rounded-2xl p-8 shadow-2xl animate-scale-up">
                 <div class="flex justify-center mb-6" id="student-signup-logo-container"></div>
                 <h2 class="text-3xl font-bold text-center text-white mb-2">Student Account Signup</h2>
@@ -501,19 +505,19 @@ HTML_CONTENT = """
                 <form id="student-signup-form">
                     <div class="mb-4">
                         <label for="student-email" class="block text-sm font-medium text-gray-300 mb-1">Email</label>
-                        <input type="email" id="student-email" name="email" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" required>
+                        <input type="email" id="student-email" name="email" class="w-full p-3 bg-slate-700/50 rounded-lg border border-slate-600" required>
                     </div>
                     <div class="mb-4">
                         <label for="student-username" class="block text-sm font-medium text-gray-300 mb-1">Username</label>
-                        <input type="text" id="student-username" name="username" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" required>
+                        <input type="text" id="student-username" name="username" class="w-full p-3 bg-slate-700/50 rounded-lg border border-slate-600" required>
                     </div>
                     <div class="mb-4">
                         <label for="student-password" class="block text-sm font-medium text-gray-300 mb-1">Password</label>
-                        <input type="password" id="student-password" name="password" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" required>
+                        <input type="password" id="student-password" name="password" class="w-full p-3 bg-slate-700/50 rounded-lg border border-slate-600" required>
                     </div>
                     <div class="mb-6">
                         <label for="student-classroom-code" class="block text-sm font-medium text-gray-300 mb-1">Classroom Code</label>
-                        <input type="text" id="student-classroom-code" name="classroom_code" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" required>
+                        <input type="text" id="student-classroom-code" name="classroom_code" class="w-full p-3 bg-slate-700/50 rounded-lg border border-slate-600" required>
                     </div>
                     <button type="submit" class="w-full bg-gradient-to-r from-green-500 to-teal-500 hover:opacity-90 text-white font-bold py-3 px-4 rounded-lg">Create Student Account</button>
                     <p id="student-signup-error" class="text-red-400 text-sm text-center h-4 mt-3"></p>
@@ -526,7 +530,7 @@ HTML_CONTENT = """
     </template>
     
     <template id="template-teacher-signup-page">
-        <div class="flex flex-col items-center justify-center h-full w-full bg-gray-900 p-4">
+        <div class="flex flex-col items-center justify-center h-full w-full bg-slate-900 p-4">
             <div class="w-full max-w-md glassmorphism rounded-2xl p-8 shadow-2xl animate-scale-up">
                 <div class="flex justify-center mb-6" id="teacher-signup-logo-container"></div>
                 <h2 class="text-3xl font-bold text-center text-white mb-2">Teacher Account Signup</h2>
@@ -534,21 +538,21 @@ HTML_CONTENT = """
                 <form id="teacher-signup-form">
                     <div class="mb-4">
                         <label for="teacher-email" class="block text-sm font-medium text-gray-300 mb-1">Email</label>
-                        <input type="email" id="teacher-email" name="email" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" required>
+                        <input type="email" id="teacher-email" name="email" class="w-full p-3 bg-slate-700/50 rounded-lg border border-slate-600" required>
                     </div>
                     <div class="mb-4">
                         <label for="teacher-username" class="block text-sm font-medium text-gray-300 mb-1">Username</label>
-                        <input type="text" id="teacher-username" name="username" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" required>
+                        <input type="text" id="teacher-username" name="username" class="w-full p-3 bg-slate-700/50 rounded-lg border border-slate-600" required>
                     </div>
                     <div class="mb-4">
                         <label for="teacher-password" class="block text-sm font-medium text-gray-300 mb-1">Password</label>
-                        <input type="password" id="teacher-password" name="password" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" required>
+                        <input type="password" id="teacher-password" name="password" class="w-full p-3 bg-slate-700/50 rounded-lg border border-slate-600" required>
                     </div>
                     <div class="mb-6">
                         <label for="teacher-secret-key" class="block text-sm font-medium text-gray-300 mb-1">Teacher Access Key</label>
-                        <input type="password" id="teacher-secret-key" name="secret_key" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" required>
+                        <input type="password" id="teacher-secret-key" name="secret_key" class="w-full p-3 bg-slate-700/50 rounded-lg border border-slate-600" required>
                     </div>
-                    <button type="submit" class="w-full bg-gradient-to-r from-blue-500 to-indigo-500 hover:opacity-90 text-white font-bold py-3 px-4 rounded-lg">Create Teacher Account</button>
+                    <button type="submit" class="w-full bg-gradient-to-r from-purple-500 to-indigo-500 hover:opacity-90 text-white font-bold py-3 px-4 rounded-lg">Create Teacher Account</button>
                     <p id="teacher-signup-error" class="text-red-400 text-sm text-center h-4 mt-3"></p>
                 </form>
             </div>
@@ -560,57 +564,56 @@ HTML_CONTENT = """
 
     <template id="template-app-wrapper">
         <div id="main-app-layout" class="flex h-full w-full transition-colors duration-500">
-            <aside id="sidebar" class="bg-gray-900/70 backdrop-blur-lg w-72 flex-shrink-0 flex flex-col p-2 h-full absolute md:relative z-20 transform transition-transform duration-300 ease-in-out -translate-x-full md:translate-x-0">
+            <aside id="sidebar" class="bg-slate-900/70 backdrop-blur-lg w-72 flex-shrink-0 flex flex-col p-2 h-full absolute md:relative z-20 transform transition-transform duration-300 ease-in-out -translate-x-full md:translate-x-0">
                 <div class="flex-shrink-0 p-2 mb-2 flex items-center gap-3">
                     <div id="app-logo-container"></div>
                     <h1 class="text-2xl font-bold brand-gradient">Myth AI</h1>
                 </div>
                 <div id="study-mode-toggle-container" class="hidden flex-shrink-0 p-2 mb-2"></div>
-                <div class="flex-shrink-0"><button id="new-chat-btn" class="w-full text-left flex items-center gap-3 p-3 rounded-lg hover:bg-gray-700/50 transition-colors duration-200"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14" /><path d="M5 12h14" /></svg> New Chat</button></div>
+                <div class="flex-shrink-0"><button id="new-chat-btn" class="w-full text-left flex items-center gap-3 p-3 rounded-lg hover:bg-slate-700/50 transition-colors duration-200"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14" /><path d="M5 12h14" /></svg> New Chat</button></div>
                 <div id="chat-history-list" class="flex-grow overflow-y-auto my-4 space-y-1 pr-1"></div>
-                <div class="flex-shrink-0 border-t border-gray-700 pt-2 space-y-1">
+                <div class="flex-shrink-0 border-t border-slate-700 pt-2 space-y-1">
                     <div id="user-info" class="p-3 text-sm"></div>
-                    <button id="upgrade-plan-btn" class="w-full text-left flex items-center gap-3 p-3 rounded-lg hover:bg-indigo-500/20 text-indigo-400 transition-colors duration-200"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6v12m-6-6h12"/></svg> Upgrade Plan</button>
+                    <button id="upgrade-plan-btn" class="w-full text-left flex items-center gap-3 p-3 rounded-lg hover:bg-violet-500/20 text-violet-400 transition-colors duration-200"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6v12m-6-6h12"/></svg> Upgrade Plan</button>
                     <button id="logout-btn" class="w-full text-left flex items-center gap-3 p-3 rounded-lg hover:bg-red-500/20 text-red-400 transition-colors duration-200"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></svg> Logout</button>
                 </div>
             </aside>
             <div id="sidebar-backdrop" class="fixed inset-0 bg-black/60 z-10 hidden md:hidden"></div>
-            <main class="flex-1 flex flex-col bg-gray-800 h-full min-w-0">
-                <header class="flex-shrink-0 p-4 flex items-center justify-between border-b border-gray-700/50">
+            <main class="flex-1 flex flex-col bg-slate-800 h-full min-w-0">
+                <header class="flex-shrink-0 p-4 flex items-center justify-between border-b border-slate-700/50">
                     <div class="flex items-center gap-2 min-w-0">
-                        <button id="menu-toggle-btn" class="p-2 rounded-lg hover:bg-gray-700/50 transition-colors md:hidden">
+                        <button id="menu-toggle-btn" class="p-2 rounded-lg hover:bg-slate-700/50 transition-colors md:hidden">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
                         </button>
                         <h2 id="chat-title" class="text-xl font-semibold truncate">New Chat</h2>
                     </div>
                     <div class="flex items-center gap-1 sm:gap-2">
-                        <button id="share-chat-btn" title="Share Chat" class="p-2 rounded-lg hover:bg-gray-700/50 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>
-                        <button id="rename-chat-btn" title="Rename Chat" class="p-2 rounded-lg hover:bg-gray-700/50 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg></button>
+                        <button id="share-chat-btn" title="Share Chat" class="p-2 rounded-lg hover:bg-slate-700/50 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>
+                        <button id="rename-chat-btn" title="Rename Chat" class="p-2 rounded-lg hover:bg-slate-700/50 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg></button>
                         <button id="delete-chat-btn" title="Delete Chat" class="p-2 rounded-lg hover:bg-red-500/20 text-red-400 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg></button>
-                        <button id="download-chat-btn" title="Download Chat" class="p-2 rounded-lg hover:bg-gray-700/50 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>
+                        <button id="download-chat-btn" title="Download Chat" class="p-2 rounded-lg hover:bg-slate-700/50 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>
                     </div>
                 </header>
-                <!-- **UI CHANGE**: The chat window now has an inner container for messages to control width on large screens -->
                 <div id="chat-window" class="flex-1 overflow-y-auto p-4 md:p-6 min-h-0 w-full">
                     <div id="message-list" class="mx-auto max-w-4xl space-y-6">
                         <!-- Messages will be rendered here by JavaScript -->
                     </div>
                 </div>
-                <div class="flex-shrink-0 p-2 md:p-4 md:px-6 border-t border-gray-700/50">
+                <div class="flex-shrink-0 p-2 md:p-4 md:px-6 border-t border-slate-700/50">
                     <div class="max-w-4xl mx-auto">
                         <div id="student-leaderboard-container" class="glassmorphism p-4 rounded-lg hidden mb-2"></div>
                         <div id="stop-generating-container" class="text-center mb-2" style="display: none;">
                             <button id="stop-generating-btn" class="bg-red-600/50 hover:bg-red-600/80 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center gap-2 mx-auto"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><rect width="10" height="10" x="3" y="3" rx="1"/></svg> Stop Generating</button>
                         </div>
                         <div class="relative glassmorphism rounded-2xl shadow-lg">
-                            <div id="preview-container" class="hidden p-2 border-b border-gray-600"></div>
+                            <div id="preview-container" class="hidden p-2 border-b border-slate-600"></div>
                             <textarea id="user-input" placeholder="Message Myth AI..." class="w-full bg-transparent p-4 pl-14 pr-16 resize-none rounded-2xl focus:outline-none" rows="1"></textarea>
                             <div class="absolute left-3 top-1/2 -translate-y-1/2 flex items-center">
-                                <button id="upload-btn" title="Upload Image" class="p-2 rounded-full hover:bg-gray-600/50 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.2 15c.7-1.2 1-2.5.7-3.9-.6-2.4-2.4-4.2-4.8-4.8-1.4-.3-2.7 0-3.9.7L12 8l-1.2-1.1c-1.2-.7-2.5-1-3.9-.7-2.4.6-4.2 2.4-4.8 4.8-.3 1.4 0 2.7.7 3.9L4 16.1M12 13l2 3h-4l2-3z"/><circle cx="12" cy="12" r="10"/></svg></button>
+                                <button id="upload-btn" title="Upload Image" class="p-2 rounded-full hover:bg-slate-600/50 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.2 15c.7-1.2 1-2.5.7-3.9-.6-2.4-2.4-4.2-4.8-4.8-1.4-.3-2.7 0-3.9.7L12 8l-1.2-1.1c-1.2-.7-2.5-1-3.9-.7-2.4.6-4.2 2.4-4.8 4.8-.3 1.4 0 2.7.7 3.9L4 16.1M12 13l2 3h-4l2-3z"/><circle cx="12" cy="12" r="10"/></svg></button>
                                 <input type="file" id="file-input" class="hidden" accept="image/png, image/jpeg, image/webp">
                             </div>
                             <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
-                                <button id="send-btn" class="p-2 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-90 transition-opacity disabled:from-gray-500 disabled:to-gray-600 disabled:cursor-not-allowed"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M2 22l20-10L2 2z"/></svg></button>
+                                <button id="send-btn" class="p-2 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 transition-opacity disabled:from-gray-500 disabled:to-gray-600 disabled:cursor-not-allowed"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M2 22l20-10L2 2z"/></svg></button>
                             </div>
                         </div>
                         <div class="text-xs text-gray-400 mt-2 text-center" id="message-limit-display"></div>
@@ -621,10 +624,10 @@ HTML_CONTENT = """
     </template>
 
     <template id="template-upgrade-page">
-        <div class="w-full h-full bg-gray-900 p-4 sm:p-6 md:p-8 overflow-y-auto">
+        <div class="w-full h-full bg-slate-900 p-4 sm:p-6 md:p-8 overflow-y-auto">
             <header class="flex justify-between items-center mb-8">
                 <h1 class="text-3xl font-bold brand-gradient">Choose Your Plan</h1>
-                <button id="back-to-chat-btn" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Back to Chat</button>
+                <button id="back-to-chat-btn" class="bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Back to Chat</button>
             </header>
             <div id="plans-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
             </div>
@@ -632,7 +635,7 @@ HTML_CONTENT = """
     </template>
     
     <template id="template-admin-dashboard">
-        <div class="w-full h-full bg-gray-900 p-4 sm:p-6 md:p-8 overflow-y-auto">
+        <div class="w-full h-full bg-slate-900 p-4 sm:p-6 md:p-8 overflow-y-auto">
             <header class="flex flex-wrap justify-between items-center gap-4 mb-8">
                 <div class="flex items-center gap-4">
                     <div id="admin-logo-container"></div>
@@ -646,7 +649,7 @@ HTML_CONTENT = """
             <div class="mb-8 p-6 glassmorphism rounded-lg">
                 <h2 class="text-xl font-semibold mb-4 text-white">Site Announcement</h2>
                 <form id="announcement-form" class="flex flex-col sm:flex-row gap-2">
-                    <input id="announcement-input" type="text" placeholder="Enter announcement text (leave empty to clear)" class="flex-grow p-2 bg-gray-700/50 rounded-lg border border-gray-600">
+                    <input id="announcement-input" type="text" placeholder="Enter announcement text (leave empty to clear)" class="flex-grow p-2 bg-slate-700/50 rounded-lg border border-slate-600">
                     <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 py-2 rounded-lg">Set Banner</button>
                 </form>
             </div>
@@ -659,7 +662,7 @@ HTML_CONTENT = """
                 <h2 class="text-xl font-semibold mb-4 text-white">User Management</h2>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left">
-                        <thead class="border-b border-gray-600">
+                        <thead class="border-b border-slate-600">
                             <tr>
                                 <th class="p-2">Username</th>
                                 <th class="p-2">Email</th>
@@ -695,7 +698,7 @@ HTML_CONTENT = """
     </template>
     
     <template id="template-special-auth-page">
-        <div class="flex flex-col items-center justify-center h-full w-full bg-gray-900 p-4">
+        <div class="flex flex-col items-center justify-center h-full w-full bg-slate-900 p-4">
             <div class="w-full max-w-md glassmorphism rounded-2xl p-8 shadow-2xl animate-scale-up">
                 <div class="flex justify-center mb-6" id="special-auth-logo-container"></div>
                 <h2 class="text-3xl font-bold text-center text-white mb-2">Special Access Signup</h2>
@@ -703,15 +706,15 @@ HTML_CONTENT = """
                 <form id="special-auth-form">
                     <div class="mb-4">
                         <label for="special-username" class="block text-sm font-medium text-gray-300 mb-1">Username</label>
-                        <input type="text" id="special-username" name="username" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" required>
+                        <input type="text" id="special-username" name="username" class="w-full p-3 bg-slate-700/50 rounded-lg border border-slate-600" required>
                     </div>
                     <div class="mb-4">
                         <label for="special-password" class="block text-sm font-medium text-gray-300 mb-1">Password</label>
-                        <input type="password" id="special-password" name="password" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" required>
+                        <input type="password" id="special-password" name="password" class="w-full p-3 bg-slate-700/50 rounded-lg border border-slate-600" required>
                     </div>
                     <div class="mb-6">
                         <label for="secret-key" class="block text-sm font-medium text-gray-300 mb-1">Secret Key</label>
-                        <input type="password" id="secret-key" name="secret_key" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" required>
+                        <input type="password" id="secret-key" name="secret_key" class="w-full p-3 bg-slate-700/50 rounded-lg border border-slate-600" required>
                     </div>
                     <button type="submit" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 text-white font-bold py-3 px-4 rounded-lg">Create Account</button>
                     <p id="special-auth-error" class="text-red-400 text-sm text-center h-4 mt-3"></p>
@@ -724,7 +727,7 @@ HTML_CONTENT = """
     </template>
     
     <template id="template-teacher-dashboard">
-        <div class="w-full h-full bg-gray-900 p-4 sm:p-6 md:p-8 overflow-y-auto">
+        <div class="w-full h-full bg-slate-900 p-4 sm:p-6 md:p-8 overflow-y-auto">
             <header class="flex flex-wrap justify-between items-center gap-4 mb-8">
                 <h1 class="text-3xl font-bold brand-gradient">Teacher Dashboard</h1>
                 <div class="flex items-center gap-2">
@@ -736,7 +739,7 @@ HTML_CONTENT = """
                 <div class="glassmorphism rounded-lg p-6">
                     <h2 class="text-xl font-bold text-white mb-2">My Classroom</h2>
                     <p class="text-gray-400 mb-4">Share this code with your students so they can join your class.</p>
-                    <p class="text-lg font-mono text-green-400 bg-gray-800 p-3 rounded-lg flex items-center justify-between">
+                    <p class="text-lg font-mono text-green-400 bg-slate-800 p-3 rounded-lg flex items-center justify-between">
                         <span id="teacher-classroom-code">Loading...</span>
                         <button id="copy-code-btn" class="text-gray-400 hover:text-white transition-colors">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
@@ -754,7 +757,7 @@ HTML_CONTENT = """
                 <h2 class="text-xl font-bold text-white mb-4">Student Activity</h2>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left">
-                        <thead class="border-b border-gray-600">
+                        <thead class="border-b border-slate-600">
                             <tr>
                                 <th class="p-2">Student</th>
                                 <th class="p-2">Plan</th>
@@ -871,7 +874,7 @@ HTML_CONTENT = """
             }
         }
 
-        function openModal(title, bodyContent, onConfirm, confirmText = 'Confirm', confirmBtnClass = 'bg-blue-600 hover:bg-blue-500') {
+        function openModal(title, bodyContent, onConfirm, confirmText = 'Confirm', confirmBtnClass = 'bg-purple-600 hover:bg-purple-500') {
             closeModal();
             const template = document.getElementById('template-modal');
             const modalWrapper = document.createElement('div');
@@ -942,7 +945,7 @@ HTML_CONTENT = """
             const body = document.createElement('div');
             body.innerHTML = `
                 <p class="mb-4 text-gray-400">Enter your email address and we'll send you a link to reset your password.</p>
-                <input type="email" id="forgot-email-input" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" placeholder="your@email.com">
+                <input type="email" id="forgot-email-input" class="w-full p-3 bg-slate-700/50 rounded-lg border border-slate-600" placeholder="your@email.com">
                 <p id="forgot-error" class="text-red-400 text-sm h-4 mt-2"></p>
             `;
             openModal('Forgot Password', body, async () => {
@@ -1189,7 +1192,8 @@ HTML_CONTENT = """
             listEl.innerHTML = '';
             Object.values(appState.chats).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).forEach(chat => {
                 const itemWrapper = document.createElement('div');
-                itemWrapper.className = `w-full flex items-center justify-between p-3 rounded-lg hover:bg-gray-700/50 transition-colors duration-200 group ${chat.id === appState.activeChatId ? 'bg-blue-600/30' : ''}`;
+                const isActive = chat.id === appState.activeChatId;
+                itemWrapper.className = `w-full flex items-center justify-between p-3 rounded-lg hover:bg-slate-700/50 transition-colors duration-200 group ${isActive ? 'bg-purple-600/30' : ''}`;
                 const chatButton = document.createElement('button');
                 chatButton.className = 'flex-grow text-left truncate text-sm font-semibold';
                 chatButton.textContent = chat.title;
@@ -1238,7 +1242,7 @@ HTML_CONTENT = """
             const container = document.getElementById('study-mode-toggle-container');
             if (!container || appState.currentUser.account_type !== 'student') return;
             container.classList.remove('hidden');
-            container.innerHTML = `<label for="study-mode-toggle" class="flex items-center cursor-pointer p-2 rounded-lg bg-yellow-900/50 border border-yellow-700"><div class="relative"><input type="checkbox" id="study-mode-toggle" class="sr-only"><div class="block bg-gray-600 w-14 h-8 rounded-full"></div><div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition"></div></div><div class="ml-3 font-medium text-yellow-300">Study Buddy Mode</div></label>`;
+            container.innerHTML = `<label for="study-mode-toggle" class="flex items-center cursor-pointer p-2 rounded-lg bg-yellow-900/50 border border-yellow-700"><div class="relative"><input type="checkbox" id="study-mode-toggle" class="sr-only"><div class="block bg-slate-600 w-14 h-8 rounded-full"></div><div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition"></div></div><div class="ml-3 font-medium text-yellow-300">Study Buddy Mode</div></label>`;
             const toggle = document.getElementById('study-mode-toggle');
             toggle.addEventListener('change', () => {
                 appState.isStudyMode = toggle.checked;
@@ -1339,7 +1343,7 @@ HTML_CONTENT = """
             const userAvatarColor = `background-color: hsl(${appState.currentUser.username.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % 360}, 50%, 60%)`;
             const aiAvatarSVG = `<svg width="20" height="20" viewBox="0 0 100 100"><path d="M35 65 L35 35 L50 50 L65 35 L65 65" stroke="white" stroke-width="8" fill="none"/></svg>`;
             const userAvatarHTML = `<div class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-white" style="${userAvatarColor}">${avatarChar}</div>`;
-            const aiAvatarHTML = `<div class="ai-avatar flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-white bg-gradient-to-br from-blue-500 to-indigo-600">${aiAvatarSVG}</div>`;
+            const aiAvatarHTML = `<div class="ai-avatar flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-white bg-gradient-to-br from-purple-500 to-indigo-600">${aiAvatarSVG}</div>`;
             
             const messageContentHTML = isStreaming 
                 ? '<div class="typing-indicator"><span></span><span></span><span></span></div>' 
@@ -1452,7 +1456,7 @@ HTML_CONTENT = """
             const body = document.createElement('div');
             body.innerHTML = `
                 <p class="mb-4 text-gray-400">Enter a new name for this chat.</p>
-                <input type="text" id="modal-input" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" value="${escapeHTML(oldTitle)}">
+                <input type="text" id="modal-input" class="w-full p-3 bg-slate-700/50 rounded-lg border border-slate-600" value="${escapeHTML(oldTitle)}">
                 <p id="modal-error" class="text-red-400 text-sm h-4 mt-2"></p>
             `;
 
@@ -1520,7 +1524,7 @@ HTML_CONTENT = """
                 const body = document.createElement('div');
                 body.innerHTML = `
                     <p class="mb-4 text-gray-400">Anyone with this link can view the chat.</p>
-                    <input type="text" id="modal-input" class="w-full p-2 bg-gray-800 rounded-lg border border-gray-600" value="${escapeHTML(shareUrl)}" readonly>
+                    <input type="text" id="modal-input" class="w-full p-2 bg-slate-800 rounded-lg border border-slate-600" value="${escapeHTML(shareUrl)}" readonly>
                 `;
                 openModal('Shareable Link', body, () => {
                     navigator.clipboard.writeText(shareUrl);
@@ -1561,8 +1565,8 @@ HTML_CONTENT = """
                     const plan = plans[planId];
                     const card = document.createElement('div');
                     const isCurrent = planId === user_plan;
-                    card.className = `p-8 glassmorphism rounded-lg border-2 ${isCurrent ? 'border-green-500' : 'border-gray-600'}`;
-                    card.innerHTML = `<h2 class="text-2xl font-bold text-center ${plan.color}">${plan.name}</h2><p class="text-4xl font-bold text-center my-4 text-white">${plan.price_string}</p><ul class="space-y-2 text-gray-300 mb-6">${plan.features.map(f => `<li>✓ ${f}</li>`).join('')}</ul><button ${isCurrent || planId === 'free' ? 'disabled' : ''} data-planid="${planId}" class="purchase-btn w-full mt-6 font-bold py-3 px-4 rounded-lg transition-opacity ${isCurrent ? 'bg-gray-600 cursor-not-allowed' : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-90'}">${isCurrent ? 'Current Plan' : 'Upgrade'}</button>`;
+                    card.className = `p-8 glassmorphism rounded-lg border-2 ${isCurrent ? 'border-green-500' : 'border-slate-600'}`;
+                    card.innerHTML = `<h2 class="text-2xl font-bold text-center ${plan.color}">${plan.name}</h2><p class="text-4xl font-bold text-center my-4 text-white">${plan.price_string}</p><ul class="space-y-2 text-gray-300 mb-6">${plan.features.map(f => `<li>✓ ${f}</li>`).join('')}</ul><button ${isCurrent || planId === 'free' ? 'disabled' : ''} data-planid="${planId}" class="purchase-btn w-full mt-6 font-bold py-3 px-4 rounded-lg transition-opacity ${isCurrent ? 'bg-slate-600 cursor-not-allowed' : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90'}">${isCurrent ? 'Current Plan' : 'Upgrade'}</button>`;
                     plansContainer.appendChild(card);
                 });
             }
@@ -1621,7 +1625,7 @@ HTML_CONTENT = """
             userList.innerHTML = '';
             data.users.forEach(user => {
                 const tr = document.createElement('tr');
-                tr.className = 'border-b border-gray-700/50';
+                tr.className = 'border-b border-slate-700/50';
                 tr.innerHTML = `<td class="p-2">${user.username}</td><td class="p-2">${user.email || 'N/A'}</td><td class="p-2">${user.role}</td><td class="p-2">${user.plan}</td><td class="p-2 flex gap-2"><button data-userid="${user.id}" data-username="${user.username}" class="delete-user-btn text-xs px-2 py-1 rounded bg-red-600">Delete</button></td>`;
                 userList.appendChild(tr);
             });
@@ -1636,8 +1640,8 @@ HTML_CONTENT = """
             studentListEl.innerHTML = '';
             students.forEach(s => {
                 const tr = document.createElement('tr');
-                tr.className = 'border-b border-gray-700/50';
-                tr.innerHTML = `<td class="p-2">${s.username}</td><td class="p-2">${s.plan}</td><td class="p-2">${s.daily_messages}/${s.message_limit}</td><td class="p-2">${s.streak} days</td><td class="p-2">${s.last_message_date}</td><td class="p-2 flex gap-2"><button data-userid="${s.id}" data-username="${s.username}" class="view-student-chats-btn text-xs px-2 py-1 rounded bg-blue-600">View</button><button data-userid="${s.id}" data-username="${s.username}" class="kick-student-btn text-xs px-2 py-1 rounded bg-red-600">Kick</button></td>`;
+                tr.className = 'border-b border-slate-700/50';
+                tr.innerHTML = `<td class="p-2">${s.username}</td><td class="p-2">${s.plan}</td><td class="p-2">${s.daily_messages}/${s.message_limit}</td><td class="p-2">${s.streak} days</td><td class="p-2">${s.last_message_date}</td><td class="p-2 flex gap-2"><button data-userid="${s.id}" data-username="${s.username}" class="view-student-chats-btn text-xs px-2 py-1 rounded bg-purple-600">View</button><button data-userid="${s.id}" data-username="${s.username}" class="kick-student-btn text-xs px-2 py-1 rounded bg-red-600">Kick</button></td>`;
                 studentListEl.appendChild(tr);
             });
             const leaderboardEl = document.getElementById('teacher-leaderboard');
@@ -1670,10 +1674,10 @@ HTML_CONTENT = """
                 if (result.chats.length > 0) {
                     result.chats.forEach(chat => {
                         const el = document.createElement('div');
-                        el.className = 'bg-gray-800 p-4 rounded-lg border border-gray-700';
+                        el.className = 'bg-slate-800 p-4 rounded-lg border border-slate-700';
                         let messagesHTML = '';
                         chat.messages.forEach(msg => {
-                            messagesHTML += `<div class="p-2 mt-2 rounded-lg text-sm ${msg.sender === 'user' ? 'bg-blue-900/30' : 'bg-gray-700/30'}"><strong>${msg.sender === 'user' ? 'Student' : 'AI'}:</strong> ${DOMPurify.sanitize(msg.content)}</div>`;
+                            messagesHTML += `<div class="p-2 mt-2 rounded-lg text-sm ${msg.sender === 'user' ? 'bg-indigo-900/30' : 'bg-slate-700/30'}"><strong>${msg.sender === 'user' ? 'Student' : 'AI'}:</strong> ${DOMPurify.sanitize(msg.content)}</div>`;
                         });
                         el.innerHTML = `<h4 class="font-semibold">${escapeHTML(chat.title)}</h4>${messagesHTML}`;
                         container.appendChild(el);
@@ -1729,7 +1733,7 @@ HTML_CONTENT = """
             const body = document.createElement('div');
             body.innerHTML = `
                 <p class="mb-4 text-gray-400">Enter the username of the user you want to impersonate.</p>
-                <input type="text" id="modal-input" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" placeholder="Username">
+                <input type="text" id="modal-input" class="w-full p-3 bg-slate-700/50 rounded-lg border border-slate-600" placeholder="Username">
                 <p id="modal-error" class="text-red-400 text-sm h-4 mt-2"></p>
             `;
             openModal('Impersonate User', body, async () => {
@@ -2363,8 +2367,4 @@ def student_leaderboard_data():
 
 
 # --- Main Execution ---
-if __name__ == '__main__':
-    # Use the PORT environment variable if available, for compatibility with hosting platforms.
-    port = int(os.environ.get('PORT', 5000))
-    # Set debug=False for production environments.
-    app.run(host='0.0.0.0', port=port, debug=True)
+# -----Big BlaZZZZZZZZ===--[
