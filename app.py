@@ -38,7 +38,6 @@ for key in REQUIRED_KEYS:
 # --- Application Setup ---
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
-DATABASE_FILE = 'database.json'
 app.config['SECURITY_PASSWORD_SALT'] = os.environ.get('SECRET_KEY')
 
 
@@ -104,11 +103,43 @@ else:
     logging.info("Email server has been configured and enabled.")
 
 
-# --- 2. Database Management ---
+# --- 2. Database Management (ENHANCED FOR SAFETY) ---
+# The DATA_DIR should NOT be in version control (e.g., add 'data/' to your .gitignore file).
+DATA_DIR = 'data'
+DATABASE_FILE = os.path.join(DATA_DIR, 'database.json')
 DB = { "users": {}, "chats": {}, "classrooms": {}, "site_settings": {"announcement": "Welcome! Student and Teacher signups are now available."} }
 
+def setup_database_dir():
+    """Ensures the data directory and .gitignore exist to protect user data."""
+    if not os.path.exists(DATA_DIR):
+        os.makedirs(DATA_DIR)
+        logging.info(f"Created data directory at: {DATA_DIR}")
+        # Create a .gitignore file in the data directory to prevent accidental commits of user data.
+        gitignore_path = os.path.join(DATA_DIR, '.gitignore')
+        if not os.path.exists(gitignore_path):
+            with open(gitignore_path, 'w') as f:
+                f.write('*\n')
+                f.write('!.gitignore\n')
+            logging.info(f"Created .gitignore in {DATA_DIR} to protect database files.")
+
 def save_database():
-    """Saves the entire in-memory DB to a JSON file atomically."""
+    """Saves the DB to a JSON file atomically and creates a backup for safety."""
+    setup_database_dir()
+
+    # Backup existing database before saving. This prevents data loss on write errors.
+    if os.path.exists(DATABASE_FILE):
+        backup_file = os.path.join(DATA_DIR, f"database_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json.bak")
+        try:
+            # os.rename is atomic on most systems
+            os.rename(DATABASE_FILE, backup_file)
+            # Clean up old backups, keeping the 5 most recent ones.
+            backups = sorted([f for f in os.listdir(DATA_DIR) if f.endswith('.bak')], reverse=True)
+            for old_backup in backups[5:]:
+                os.remove(os.path.join(DATA_DIR, old_backup))
+        except Exception as e:
+            logging.error(f"Could not create database backup: {e}")
+
+    # Save current database atomically using a temporary file.
     temp_file = f"{DATABASE_FILE}.tmp"
     try:
         with open(temp_file, 'w') as f:
@@ -119,26 +150,53 @@ def save_database():
                 "site_settings": DB['site_settings'],
             }
             json.dump(serializable_db, f, indent=4)
-        os.replace(temp_file, DATABASE_FILE)
+        os.replace(temp_file, DATABASE_FILE) # Atomic operation
     except Exception as e:
-        logging.error(f"Failed to save database: {e}")
+        logging.error(f"FATAL: Failed to save database: {e}")
+        # If save fails, try to restore the most recent backup immediately.
+        if 'backup_file' in locals() and os.path.exists(backup_file):
+            os.rename(backup_file, DATABASE_FILE)
+            logging.info("Restored database from immediate backup after save failure.")
         if os.path.exists(temp_file):
             os.remove(temp_file)
 
 def load_database():
-    """Loads the database from a JSON file if it exists."""
+    """Loads the database from JSON, with fallback to the most recent backup."""
     global DB
+    setup_database_dir()
     if not os.path.exists(DATABASE_FILE):
+        logging.warning(f"Database file not found at {DATABASE_FILE}. A new one will be created on first save.")
         return
+
     try:
         with open(DATABASE_FILE, 'r') as f:
             data = json.load(f)
-            DB['chats'] = data.get('chats', {})
-            DB['site_settings'] = data.get('site_settings', {"announcement": ""})
-            DB['classrooms'] = data.get('classrooms', {})
-            DB['users'] = {uid: User.from_dict(u_data) for uid, u_data in data.get('users', {}).items()}
-    except (json.JSONDecodeError, FileNotFoundError) as e:
-        logging.error(f"Could not load database file. Starting fresh. Error: {e}")
+        DB['chats'] = data.get('chats', {})
+        DB['site_settings'] = data.get('site_settings', {"announcement": ""})
+        DB['classrooms'] = data.get('classrooms', {})
+        DB['users'] = {uid: User.from_dict(u_data) for uid, u_data in data.get('users', {}).items()}
+        logging.info(f"Successfully loaded database from {DATABASE_FILE}")
+    except (json.JSONDecodeError, FileNotFoundError, TypeError) as e:
+        logging.error(f"Could not load main database file '{DATABASE_FILE}'. Error: {e}")
+        # Attempt to load the most recent backup if main file is corrupt/missing.
+        backups = sorted([f for f in os.listdir(DATA_DIR) if f.endswith('.bak')], reverse=True)
+        if backups:
+            backup_to_load = os.path.join(DATA_DIR, backups[0])
+            logging.info(f"Attempting to load most recent backup: {backup_to_load}")
+            try:
+                with open(backup_to_load, 'r') as f:
+                    data = json.load(f)
+                DB['chats'] = data.get('chats', {})
+                DB['site_settings'] = data.get('site_settings', {"announcement": ""})
+                DB['classrooms'] = data.get('classrooms', {})
+                DB['users'] = {uid: User.from_dict(u_data) for uid, u_data in data.get('users', {}).items()}
+                # If backup is loaded successfully, restore it as the main DB file
+                os.rename(backup_to_load, DATABASE_FILE)
+                logging.info(f"SUCCESS: Loaded and restored from backup file {backups[0]}")
+            except Exception as backup_e:
+                logging.error(f"FATAL: Failed to load backup file as well. Starting with a fresh database. Error: {backup_e}")
+        else:
+            logging.warning("No backups found. Starting with a fresh database.")
 
 
 # --- 3. User and Session Management ---
@@ -188,10 +246,17 @@ class User(UserMixin):
 
     @staticmethod
     def from_dict(data):
-        # Handles loading older user models that may not have the 'email' field.
+        # Handles loading older user models that may not have all fields.
         data.setdefault('email', None)
-        # Handles loading users who don't have a password (e.g., from OAuth)
         data.setdefault('password_hash', None)
+        data.setdefault('role', 'user')
+        data.setdefault('plan', 'free')
+        data.setdefault('account_type', 'general')
+        data.setdefault('daily_messages', 0)
+        data.setdefault('last_message_date', datetime.now().strftime("%Y-%m-%d"))
+        data.setdefault('classroom_code', None)
+        data.setdefault('streak', 0)
+        data.setdefault('last_streak_date', datetime.now().strftime("%Y-%m-%d"))
         return User(**data)
 
 def user_to_dict(user):
@@ -221,6 +286,7 @@ def initialize_database_defaults():
     if made_changes:
         save_database()
 
+# Initial load of the application
 load_database()
 with app.app_context():
     initialize_database_defaults()
@@ -315,7 +381,7 @@ HTML_CONTENT = """
         .copy-code-btn { position: absolute; top: 0.5rem; right: 0.5rem; background-color: #374151; color: white; border: none; padding: 0.25rem 0.5rem; border-radius: 0.25rem; cursor: pointer; opacity: 0; transition: opacity 0.2s; font-size: 0.75rem; }
         pre:hover .copy-code-btn { opacity: 1; }
         #sidebar.hidden { transform: translateX(-100%); }
-        /* NEW/UPDATED Study Buddy Theme (Yellow/Orange) */
+        /* Study Buddy Theme */
         .study-buddy-mode { background-color: #432500; color: #ffedd5; }
         .study-buddy-mode #sidebar { background: rgba(30, 16, 0, 0.7); color: #fed7aa; }
         .study-buddy-mode #chat-window { color: #fed7aa; }
@@ -509,22 +575,27 @@ HTML_CONTENT = """
                 </div>
             </aside>
             <div id="sidebar-backdrop" class="fixed inset-0 bg-black/60 z-10 hidden md:hidden"></div>
-            <main class="flex-1 flex flex-col bg-gray-800 h-full">
+            <main class="flex-1 flex flex-col bg-gray-800 h-full min-w-0">
                 <header class="flex-shrink-0 p-4 flex items-center justify-between border-b border-gray-700/50">
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 min-w-0">
                         <button id="menu-toggle-btn" class="p-2 rounded-lg hover:bg-gray-700/50 transition-colors md:hidden">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
                         </button>
                         <h2 id="chat-title" class="text-xl font-semibold truncate">New Chat</h2>
                     </div>
-                    <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-1 sm:gap-2">
                         <button id="share-chat-btn" title="Share Chat" class="p-2 rounded-lg hover:bg-gray-700/50 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>
                         <button id="rename-chat-btn" title="Rename Chat" class="p-2 rounded-lg hover:bg-gray-700/50 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg></button>
                         <button id="delete-chat-btn" title="Delete Chat" class="p-2 rounded-lg hover:bg-red-500/20 text-red-400 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg></button>
                         <button id="download-chat-btn" title="Download Chat" class="p-2 rounded-lg hover:bg-gray-700/50 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>
                     </div>
                 </header>
-                <div id="chat-window" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 min-h-0"></div>
+                <!-- **UI CHANGE**: The chat window now has an inner container for messages to control width on large screens -->
+                <div id="chat-window" class="flex-1 overflow-y-auto p-4 md:p-6 min-h-0 w-full">
+                    <div id="message-list" class="mx-auto max-w-4xl space-y-6">
+                        <!-- Messages will be rendered here by JavaScript -->
+                    </div>
+                </div>
                 <div class="flex-shrink-0 p-2 md:p-4 md:px-6 border-t border-gray-700/50">
                     <div class="max-w-4xl mx-auto">
                         <div id="student-leaderboard-container" class="glassmorphism p-4 rounded-lg hidden mb-2"></div>
@@ -605,8 +676,8 @@ HTML_CONTENT = """
     </template>
     
     <template id="template-modal">
-        <div class="modal-backdrop fixed inset-0 bg-black/60 animate-fade-in"></div>
-        <div class="modal-content fixed inset-0 flex items-center justify-center p-4">
+        <div class="modal-backdrop fixed inset-0 bg-black/60 animate-fade-in z-50"></div>
+        <div class="modal-content fixed inset-0 flex items-center justify-center p-4 z-50">
             <div class="w-full max-w-md glassmorphism rounded-2xl p-8 shadow-2xl animate-scale-up relative">
                 <button class="close-modal-btn absolute top-4 right-4 text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
                 <h3 id="modal-title" class="text-2xl font-bold text-center mb-4">Modal Title</h3>
@@ -699,7 +770,7 @@ HTML_CONTENT = """
             </div>
             <div class="glassmorphism rounded-lg p-6 mt-8">
                 <h2 class="text-xl font-bold text-white mb-4">Student Chats</h2>
-                <div id="teacher-student-chats" class="space-y-4">
+                <div id="teacher-student-chats" class="space-y-4 max-h-96 overflow-y-auto">
                     <p class="text-gray-400">Select a student to view their chats.</p>
                 </div>
             </div>
@@ -708,7 +779,7 @@ HTML_CONTENT = """
 
     <script>
     /****************************************************************************
-     * JAVASCRIPT FRONTEND LOGIC (Myth AI - Revamped with New Features)
+     * JAVASCRIPT FRONTEND LOGIC (Myth AI - Refactored with New Features)
      ****************************************************************************/
     document.addEventListener('DOMContentLoaded', () => {
         const appState = {
@@ -769,6 +840,13 @@ HTML_CONTENT = """
             }
         }
 
+        function escapeHTML(str) {
+            if (typeof str !== 'string') return '';
+            const p = document.createElement('p');
+            p.appendChild(document.createTextNode(str));
+            return p.innerHTML;
+        }
+
         async function apiCall(endpoint, options = {}) {
             try {
                 const headers = { ...(options.headers || {}) };
@@ -793,7 +871,7 @@ HTML_CONTENT = """
             }
         }
 
-        function openModal(title, bodyContent, onConfirm, confirmText = 'Confirm') {
+        function openModal(title, bodyContent, onConfirm, confirmText = 'Confirm', confirmBtnClass = 'bg-blue-600 hover:bg-blue-500') {
             closeModal();
             const template = document.getElementById('template-modal');
             const modalWrapper = document.createElement('div');
@@ -813,7 +891,7 @@ HTML_CONTENT = """
 
             if (onConfirm) {
                 const confirmBtn = document.createElement('button');
-                confirmBtn.className = 'w-full mt-6 bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-lg';
+                confirmBtn.className = `w-full mt-6 text-white font-bold py-2 px-4 rounded-lg ${confirmBtnClass}`;
                 confirmBtn.textContent = confirmText;
                 confirmBtn.onclick = () => { onConfirm(); };
                 modalBody.appendChild(confirmBtn);
@@ -1071,13 +1149,15 @@ HTML_CONTENT = """
             }
         }
         async function renderActiveChat(){
-            const chatWindow = document.getElementById('chat-window');
+            const messageList = document.getElementById('message-list');
             const chatTitle = document.getElementById('chat-title');
-            if (!chatWindow || !chatTitle) return;
-            chatWindow.innerHTML = '';
+            if (!messageList || !chatTitle) return;
+
+            messageList.innerHTML = '';
             appState.uploadedFile = null;
             updatePreviewContainer();
             const chat = appState.chats[appState.activeChatId];
+
             if (chat && chat.messages && chat.messages.length > 0) {
                 chatTitle.textContent = chat.title;
                 chat.messages.forEach(msg => addMessageToDOM(msg));
@@ -1089,11 +1169,11 @@ HTML_CONTENT = """
             updateUIState();
         }
         function renderWelcomeScreen(){
-            const chatWindow = document.getElementById('chat-window');
-            if (!chatWindow) return;
+            const messageList = document.getElementById('message-list');
+            if (!messageList) return;
             const template = document.getElementById('template-welcome-screen');
-            chatWindow.innerHTML = '';
-            chatWindow.appendChild(template.content.cloneNode(true));
+            messageList.innerHTML = '';
+            messageList.appendChild(template.content.cloneNode(true));
             renderLogo('welcome-logo-container');
             if (appState.isStudyMode) {
                 document.getElementById('welcome-title').textContent = "Welcome to Study Buddy!";
@@ -1142,7 +1222,8 @@ HTML_CONTENT = """
             if (sendBtn) sendBtn.disabled = appState.isAITyping;
             const stopContainer = document.getElementById('stop-generating-container');
             if (stopContainer) stopContainer.style.display = appState.isAITyping ? 'block' : 'none';
-            const chatExists = !!appState.activeChatId;
+            
+            const chatExists = !!(appState.activeChatId && appState.chats[appState.activeChatId] && appState.chats[appState.activeChatId].messages.length > 0);
             ['share-chat-btn', 'rename-chat-btn', 'delete-chat-btn', 'download-chat-btn'].forEach(id => {
                 const btn = document.getElementById(id);
                 if (btn) btn.style.display = chatExists ? 'flex' : 'none';
@@ -1195,7 +1276,7 @@ HTML_CONTENT = """
                     if (!await createNewChat(false)) throw new Error("Could not start chat.");
                 }
                 if (appState.chats[appState.activeChatId]?.messages.length === 0) {
-                    document.getElementById('chat-window').innerHTML = '';
+                    document.getElementById('message-list').innerHTML = '';
                 }
                 addMessageToDOM({ sender: 'user', content: prompt });
                 const aiContentEl = addMessageToDOM({ sender: 'model', content: '' }, true).querySelector('.message-content');
@@ -1247,8 +1328,10 @@ HTML_CONTENT = """
             }
         }
         function addMessageToDOM(msg, isStreaming = false){
+            const messageList = document.getElementById('message-list');
             const chatWindow = document.getElementById('chat-window');
-            if (!chatWindow || !appState.currentUser) return null;
+            if (!messageList || !chatWindow || !appState.currentUser) return null;
+
             const wrapper = document.createElement('div');
             wrapper.className = 'message-wrapper flex items-start gap-4';
             const senderIsAI = msg.sender === 'model';
@@ -1257,8 +1340,14 @@ HTML_CONTENT = """
             const aiAvatarSVG = `<svg width="20" height="20" viewBox="0 0 100 100"><path d="M35 65 L35 35 L50 50 L65 35 L65 65" stroke="white" stroke-width="8" fill="none"/></svg>`;
             const userAvatarHTML = `<div class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-white" style="${userAvatarColor}">${avatarChar}</div>`;
             const aiAvatarHTML = `<div class="ai-avatar flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-white bg-gradient-to-br from-blue-500 to-indigo-600">${aiAvatarSVG}</div>`;
-            wrapper.innerHTML = `${senderIsAI ? aiAvatarHTML : userAvatarHTML}<div class="flex-1 min-w-0"><div class="font-bold">${senderIsAI ? (appState.isStudyMode ? 'Study Buddy' : 'Myth AI') : 'You'}</div><div class="prose prose-invert max-w-none message-content">${isStreaming ? '<div class="typing-indicator"><span></span><span></span><span></span></div>' : DOMPurify.sanitize(marked.parse(msg.content))}</div></div>`;
-            chatWindow.appendChild(wrapper);
+            
+            const messageContentHTML = isStreaming 
+                ? '<div class="typing-indicator"><span></span><span></span><span></span></div>' 
+                : DOMPurify.sanitize(marked.parse(msg.content || ""));
+
+            wrapper.innerHTML = `${senderIsAI ? aiAvatarHTML : userAvatarHTML}<div class="flex-1 min-w-0"><div class="font-bold">${senderIsAI ? (appState.isStudyMode ? 'Study Buddy' : 'Myth AI') : 'You'}</div><div class="prose prose-invert max-w-none message-content">${messageContentHTML}</div></div>`;
+            
+            messageList.appendChild(wrapper);
             chatWindow.scrollTop = chatWindow.scrollHeight;
             return wrapper;
         }
@@ -1291,6 +1380,8 @@ HTML_CONTENT = """
             });
         }
         function setupAppEventListeners(){
+            // Use event delegation for dynamically created elements within the app container.
+            // This is more efficient and reliable than adding listeners to each button individually.
             DOMElements.appContainer.onclick = (e) => {
                 const target = e.target.closest('button');
                 if (!target) return;
@@ -1315,10 +1406,10 @@ HTML_CONTENT = """
                     case 'teacher-gen-code-btn': handleGenerateClassroomCode(); break;
                     case 'copy-code-btn': handleCopyClassroomCode(); break;
                 }
-                if (target.classList.contains('delete-user-btn')) handleAdminDeleteUser(target.dataset.userid);
+                if (target.classList.contains('delete-user-btn')) handleAdminDeleteUser(target.dataset.userid, target.dataset.username);
                 if (target.classList.contains('purchase-btn') && !target.disabled) handlePurchase(target.dataset.planid);
-                if (target.classList.contains('view-student-chats-btn')) handleViewStudentChats(target.dataset.userid);
-                if (target.classList.contains('kick-student-btn')) handleKickStudent(target.dataset.userid);
+                if (target.classList.contains('view-student-chats-btn')) handleViewStudentChats(target.dataset.userid, target.dataset.username);
+                if (target.classList.contains('kick-student-btn')) handleKickStudent(target.dataset.userid, target.dataset.username);
             };
             const userInput = document.getElementById('user-input');
             if (userInput) {
@@ -1355,28 +1446,51 @@ HTML_CONTENT = """
             renderAuthPage();
         }
         function handleRenameChat(){
-             if (!appState.activeChatId) return;
+            if (!appState.activeChatId) return;
             const oldTitle = appState.chats[appState.activeChatId].title;
-            const newTitle = prompt("Enter a new name for this chat:", oldTitle);
-            if (newTitle && newTitle.trim() !== oldTitle) {
+
+            const body = document.createElement('div');
+            body.innerHTML = `
+                <p class="mb-4 text-gray-400">Enter a new name for this chat.</p>
+                <input type="text" id="modal-input" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" value="${escapeHTML(oldTitle)}">
+                <p id="modal-error" class="text-red-400 text-sm h-4 mt-2"></p>
+            `;
+
+            openModal('Rename Chat', body, () => {
+                const input = document.getElementById('modal-input');
+                const newTitle = input.value.trim();
+                const errorEl = document.getElementById('modal-error');
+                if (!newTitle) {
+                    errorEl.textContent = 'Title cannot be empty.';
+                    return;
+                }
+                if (newTitle === oldTitle) {
+                    closeModal();
+                    return;
+                }
+
                 apiCall('/api/chat/rename', {
                     method: 'POST',
-                    body: JSON.stringify({ chat_id: appState.activeChatId, title: newTitle.trim() }),
+                    body: JSON.stringify({ chat_id: appState.activeChatId, title: newTitle }),
                 }).then(result => {
                     if (result.success) {
-                        appState.chats[appState.activeChatId].title = newTitle.trim();
+                        appState.chats[appState.activeChatId].title = newTitle;
                         renderChatHistoryList();
-                        if (appState.activeChatId === appState.chats[appState.activeChatId].id) {
-                            document.getElementById('chat-title').textContent = newTitle.trim();
-                        }
+                        document.getElementById('chat-title').textContent = newTitle;
                         showToast("Chat renamed!", "success");
+                        closeModal();
+                    } else {
+                        errorEl.textContent = result.error || 'Failed to rename chat.';
                     }
                 });
-            }
+            }, 'Save');
         }
         function handleDeleteChat(){
             if (!appState.activeChatId) return;
-            if (confirm("Are you sure you want to delete this chat? This action cannot be undone.")) {
+            const chatTitle = appState.chats[appState.activeChatId].title;
+            const bodyContent = `Are you sure you want to delete the chat "<strong>${escapeHTML(chatTitle)}</strong>"? This action cannot be undone.`;
+
+            openModal('Delete Chat', bodyContent, () => {
                 apiCall('/api/chat/delete', {
                     method: 'POST',
                     body: JSON.stringify({ chat_id: appState.activeChatId }),
@@ -1388,9 +1502,12 @@ HTML_CONTENT = """
                         renderChatHistoryList();
                         renderActiveChat();
                         showToast("Chat deleted.", "success");
+                    } else {
+                        showToast(result.error || 'Failed to delete chat.', 'error');
                     }
+                    closeModal();
                 });
-            }
+            }, 'Delete', 'bg-red-600 hover:bg-red-500');
         }
         async function handleShareChat(){
             if (!appState.activeChatId) return;
@@ -1400,15 +1517,14 @@ HTML_CONTENT = """
             });
             if (result.success) {
                 const shareUrl = `${window.location.origin}/share/${result.share_id}`;
-                const input = document.createElement('input');
-                input.type = 'text';
-                input.className = 'w-full p-2 bg-gray-700/50 rounded-lg border border-gray-600';
-                input.value = shareUrl;
-                input.readOnly = true;
-                openModal('Shareable Link', input, () => {
+                const body = document.createElement('div');
+                body.innerHTML = `
+                    <p class="mb-4 text-gray-400">Anyone with this link can view the chat.</p>
+                    <input type="text" id="modal-input" class="w-full p-2 bg-gray-800 rounded-lg border border-gray-600" value="${escapeHTML(shareUrl)}" readonly>
+                `;
+                openModal('Shareable Link', body, () => {
                     navigator.clipboard.writeText(shareUrl);
                     showToast('Link copied to clipboard!', 'success');
-                    closeModal();
                 }, 'Copy Link');
             }
         }
@@ -1419,14 +1535,15 @@ HTML_CONTENT = """
                 showToast("No chat content to download.", "info");
                 return;
             }
-            let content = `# ${chat.title}\\n\\n`;
+            let content = `# ${chat.title}\n\n`;
             chat.messages.forEach(msg => {
-                content += `**${msg.sender === 'user' ? 'You' : 'AI'}:**\\n${msg.content}\\n\\n`;
+                const sender = msg.sender === 'user' ? (appState.currentUser.username || 'You') : 'Myth AI';
+                content += `**${sender}:**\n${msg.content}\n\n---\n\n`;
             });
-            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = `${chat.title.replace(/[^a-z0-9]/gi, '_')}_chat.txt`;
+            link.download = `${chat.title.replace(/[^a-z0-9]/gi, '_')}_chat.md`;
             link.click();
             link.remove();
             showToast("Chat downloaded!", "success");
@@ -1505,7 +1622,7 @@ HTML_CONTENT = """
             data.users.forEach(user => {
                 const tr = document.createElement('tr');
                 tr.className = 'border-b border-gray-700/50';
-                tr.innerHTML = `<td class="p-2">${user.username}</td><td class="p-2">${user.email || 'N/A'}</td><td class="p-2">${user.role}</td><td class="p-2">${user.plan}</td><td class="p-2 flex gap-2"><button data-userid="${user.id}" class="delete-user-btn text-xs px-2 py-1 rounded bg-red-600">Delete</button></td>`;
+                tr.innerHTML = `<td class="p-2">${user.username}</td><td class="p-2">${user.email || 'N/A'}</td><td class="p-2">${user.role}</td><td class="p-2">${user.plan}</td><td class="p-2 flex gap-2"><button data-userid="${user.id}" data-username="${user.username}" class="delete-user-btn text-xs px-2 py-1 rounded bg-red-600">Delete</button></td>`;
                 userList.appendChild(tr);
             });
         }
@@ -1520,7 +1637,7 @@ HTML_CONTENT = """
             students.forEach(s => {
                 const tr = document.createElement('tr');
                 tr.className = 'border-b border-gray-700/50';
-                tr.innerHTML = `<td class="p-2">${s.username}</td><td class="p-2">${s.plan}</td><td class="p-2">${s.daily_messages}/${s.message_limit}</td><td class="p-2">${s.streak} days</td><td class="p-2">${s.last_message_date}</td><td class="p-2 flex gap-2"><button data-userid="${s.id}" class="view-student-chats-btn text-xs px-2 py-1 rounded bg-blue-600">View</button><button data-userid="${s.id}" class="kick-student-btn text-xs px-2 py-1 rounded bg-red-600">Kick</button></td>`;
+                tr.innerHTML = `<td class="p-2">${s.username}</td><td class="p-2">${s.plan}</td><td class="p-2">${s.daily_messages}/${s.message_limit}</td><td class="p-2">${s.streak} days</td><td class="p-2">${s.last_message_date}</td><td class="p-2 flex gap-2"><button data-userid="${s.id}" data-username="${s.username}" class="view-student-chats-btn text-xs px-2 py-1 rounded bg-blue-600">View</button><button data-userid="${s.id}" data-username="${s.username}" class="kick-student-btn text-xs px-2 py-1 rounded bg-red-600">Kick</button></td>`;
                 studentListEl.appendChild(tr);
             });
             const leaderboardEl = document.getElementById('teacher-leaderboard');
@@ -1545,28 +1662,30 @@ HTML_CONTENT = """
                 showToast('Classroom code copied!', 'success');
             }
         }
-        async function handleViewStudentChats(studentId){
+        async function handleViewStudentChats(studentId, studentUsername){
             const result = await apiCall(`/api/teacher/student_chats/${studentId}`);
             if (result.success) {
                 const container = document.getElementById('teacher-student-chats');
-                container.innerHTML = '';
+                container.innerHTML = `<h3 class="text-lg font-bold text-white mb-2">Chat History for ${escapeHTML(studentUsername)}</h3>`;
                 if (result.chats.length > 0) {
                     result.chats.forEach(chat => {
                         const el = document.createElement('div');
                         el.className = 'bg-gray-800 p-4 rounded-lg border border-gray-700';
-                        el.innerHTML = `<h3 class="text-lg font-bold">${chat.title}</h3>`;
+                        let messagesHTML = '';
                         chat.messages.forEach(msg => {
-                            el.innerHTML += `<div class="p-2 mt-2 rounded-lg ${msg.sender === 'user' ? 'bg-blue-900/30' : 'bg-gray-700/30'}"><strong>${msg.sender === 'user' ? 'Student' : 'AI'}:</strong> ${DOMPurify.sanitize(msg.content)}</div>`;
+                            messagesHTML += `<div class="p-2 mt-2 rounded-lg text-sm ${msg.sender === 'user' ? 'bg-blue-900/30' : 'bg-gray-700/30'}"><strong>${msg.sender === 'user' ? 'Student' : 'AI'}:</strong> ${DOMPurify.sanitize(msg.content)}</div>`;
                         });
+                        el.innerHTML = `<h4 class="font-semibold">${escapeHTML(chat.title)}</h4>${messagesHTML}`;
                         container.appendChild(el);
                     });
                 } else {
-                    container.innerHTML = '<p class="text-gray-400">This student has no chat history.</p>';
+                    container.innerHTML += '<p class="text-gray-400">This student has no chat history.</p>';
                 }
             }
         }
-        async function handleKickStudent(studentId){
-            if (confirm("Are you sure you want to kick this student?")) {
+        async function handleKickStudent(studentId, studentUsername){
+            const bodyContent = `Are you sure you want to kick the student "<strong>${escapeHTML(studentUsername)}</strong>" from your classroom?`;
+            openModal('Kick Student', bodyContent, async () => {
                 const result = await apiCall('/api/teacher/kick_student', {
                     method: 'POST',
                     body: JSON.stringify({ student_id: studentId }),
@@ -1575,7 +1694,8 @@ HTML_CONTENT = """
                     showToast(result.message, 'success');
                     await fetchTeacherData();
                 }
-            }
+                closeModal();
+            }, 'Kick Student', 'bg-red-600 hover:bg-red-500');
         }
         async function handleSetAnnouncement(e){
             e.preventDefault();
@@ -1590,8 +1710,9 @@ HTML_CONTENT = """
                 DOMElements.announcementBanner.classList.toggle('hidden', !text);
             }
         }
-        function handleAdminDeleteUser(userId){
-            if (confirm(`Delete user ${userId}? This is irreversible.`)) {
+        function handleAdminDeleteUser(userId, username){
+            const bodyContent = `Are you sure you want to delete user "<strong>${escapeHTML(username)}</strong>"? This is irreversible.`;
+            openModal('Delete User', bodyContent, () => {
                 apiCall('/api/admin/delete_user', {
                     method: 'POST',
                     body: JSON.stringify({ user_id: userId }),
@@ -1600,20 +1721,35 @@ HTML_CONTENT = """
                         showToast(result.message, 'success');
                         fetchAdminData();
                     }
+                    closeModal();
                 });
-            }
+            }, 'Delete User', 'bg-red-600 hover:bg-red-500');
         }
         async function handleImpersonate(){
-            const username = prompt("Enter username to impersonate:");
-            if (!username) return;
-            const result = await apiCall('/api/admin/impersonate', {
-                method: 'POST',
-                body: JSON.stringify({ username }),
-            });
-            if (result.success) {
-                showToast(`Now impersonating ${username}. Reloading...`, 'success');
-                setTimeout(() => window.location.reload(), 1500);
-            }
+            const body = document.createElement('div');
+            body.innerHTML = `
+                <p class="mb-4 text-gray-400">Enter the username of the user you want to impersonate.</p>
+                <input type="text" id="modal-input" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" placeholder="Username">
+                <p id="modal-error" class="text-red-400 text-sm h-4 mt-2"></p>
+            `;
+            openModal('Impersonate User', body, async () => {
+                const username = document.getElementById('modal-input').value;
+                const errorEl = document.getElementById('modal-error');
+                if (!username) {
+                    errorEl.textContent = 'Username is required.';
+                    return;
+                }
+                const result = await apiCall('/api/admin/impersonate', {
+                    method: 'POST',
+                    body: JSON.stringify({ username }),
+                });
+                if (result.success) {
+                    showToast(`Now impersonating ${username}. Reloading...`, 'success');
+                    setTimeout(() => window.location.reload(), 1500);
+                } else {
+                    errorEl.textContent = result.error;
+                }
+            }, 'Impersonate');
         }
 
         // --- INITIAL LOAD ---
@@ -1628,6 +1764,9 @@ HTML_CONTENT = """
 
 def send_password_reset_email(user):
     """Generates a reset token and sends the email."""
+    if not EMAIL_ENABLED:
+        logging.error("Attempted to send email, but mail is not configured.")
+        return False
     try:
         token = password_reset_serializer.dumps(user.email, salt='password-reset-salt')
         reset_url = url_for('index', _external=True) + f"reset-password/{token}"
@@ -1837,6 +1976,7 @@ def request_password_reset():
     user = User.get_by_email(email)
     if user:
         send_password_reset_email(user)
+    # Always return success to prevent user enumeration.
     return jsonify({"success": True, "message": "If an account with that email exists, a reset link has been sent."})
 
 @app.route('/api/reset-with-token', methods=['POST'])
@@ -1949,7 +2089,7 @@ def chat_api():
 
     chat['messages'].append({'sender': 'user', 'content': prompt})
     current_user.daily_messages += 1
-    save_database()
+    # No need to save here, will be saved after AI response.
 
     model = genai.GenerativeModel(plan_details['model'], system_instruction=system_instruction)
     chat_session = model.start_chat(history=history)
@@ -1968,7 +2108,7 @@ def chat_api():
             return
 
         chat['messages'].append({'sender': 'model', 'content': full_response_text})
-        if len(chat['messages']) <= 2:
+        if len(chat['messages']) <= 2 and prompt:
             try:
                 title_prompt = f"Summarize with a short title (4 words max): User: \"{prompt}\" Assistant: \"{full_response_text[:100]}\""
                 title_response = genai.GenerativeModel('gemini-1.5-flash-latest').generate_content(title_prompt)
@@ -2210,7 +2350,7 @@ def get_student_chats(student_id):
     if not student.classroom_code or DB['classrooms'].get(student.classroom_code, {}).get('teacher_id') != current_user.id:
         return jsonify({"error": "Unauthorized."}), 403
     student_chats = list(get_all_user_chats(student_id).values())
-    return jsonify({"success": True, "chats": student_chats})
+    return jsonify({"success": True, "chats": sorted(student_chats, key=lambda c: c.get('created_at'), reverse=True)})
     
 @app.route('/api/student/leaderboard', methods=['GET'])
 @login_required
@@ -2224,4 +2364,7 @@ def student_leaderboard_data():
 
 # --- Main Execution ---
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=True)
+    # Use the PORT environment variable if available, for compatibility with hosting platforms.
+    port = int(os.environ.get('PORT', 5000))
+    # Set debug=False for production environments.
+    app.run(host='0.0.0.0', port=port, debug=True)
