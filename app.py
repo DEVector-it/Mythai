@@ -263,7 +263,7 @@ HTML_CONTENT = """
         .study-buddy-mode ::-webkit-scrollbar-track { background: #064e3b; }
         .study-buddy-mode ::-webkit-scrollbar-thumb { background: #047857; }
         .study-buddy-mode #sidebar button:hover { background-color: rgba(5, 150, 105, 0.3); }
-        .study-buddy-mode #sidebar .bg-blue-600\\/30 { background-color: rgba(16, 185, 129, 0.4); }
+        .study-buddy-mode #sidebar .bg-blue-600\/30 { background-color: rgba(16, 185, 129, 0.4); }
         .typing-indicator span { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: currentColor; margin: 0 2px; animation: typing-bounce 1.4s infinite ease-in-out both; }
         .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
         .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
@@ -276,7 +276,6 @@ HTML_CONTENT = """
     <div id="modal-container"></div>
     <div id="toast-container" class="fixed top-6 right-6 z-[100] flex flex-col gap-2"></div>
 
-    <!-- TEMPLATES START HERE -->
     <template id="template-logo">
         <svg width="48" height="48" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
             <defs>
@@ -406,7 +405,7 @@ HTML_CONTENT = """
                         <h2 id="chat-title" class="text-xl font-semibold truncate">New Chat</h2>
                     </div>
                     <div class="flex items-center gap-4">
-                         <button id="share-chat-btn" title="Share Chat" class="p-2 rounded-lg hover:bg-gray-700/50 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>
+                        <button id="share-chat-btn" title="Share Chat" class="p-2 rounded-lg hover:bg-gray-700/50 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>
                         <button id="rename-chat-btn" title="Rename Chat" class="p-2 rounded-lg hover:bg-gray-700/50 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg></button>
                         <button id="delete-chat-btn" title="Delete Chat" class="p-2 rounded-lg hover:bg-red-500/20 text-red-400 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg></button>
                     </div>
@@ -428,10 +427,13 @@ HTML_CONTENT = """
                                 <button id="send-btn" class="p-2 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-90 transition-opacity disabled:from-gray-500 disabled:to-gray-600 disabled:cursor-not-allowed"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M2 22l20-10L2 2z"/></svg></button>
                             </div>
                         </div>
-                         <div class="text-xs text-gray-400 mt-2 text-center" id="message-limit-display"></div>
+                        <div class="text-xs text-gray-400 mt-2 text-center" id="message-limit-display"></div>
                     </div>
                 </div>
             </main>
+        </div>
+        <div id="adsense-container" class="absolute top-4 right-4 z-10 w-48 h-24 bg-gray-700 rounded-lg flex items-center justify-center text-gray-400 text-xs">
+            <p>AdSense Ad Here</p>
         </div>
     </template>
 
@@ -442,8 +444,7 @@ HTML_CONTENT = """
                 <button id="back-to-chat-btn" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Back to Chat</button>
             </header>
             <div id="plans-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-                <!-- Plan cards will be injected here by JS -->
-            </div>
+                </div>
         </div>
     </template>
     
@@ -554,9 +555,7 @@ HTML_CONTENT = """
             </div>
         </div>
     </template>
-    <!-- TEMPLATES END HERE -->
-
-<script>
+    <script>
 /****************************************************************************
  * JAVASCRIPT FRONTEND LOGIC (MYTH AI V7 - SECURE & STABLE)
  ****************************************************************************/
@@ -866,10 +865,13 @@ document.addEventListener('DOMContentLoaded', () => {
         Object.values(appState.chats)
             .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
             .forEach(chat => {
-                const item = document.createElement('button');
-                item.className = `w-full text-left p-3 rounded-lg hover:bg-gray-700/50 transition-colors duration-200 truncate text-sm ${chat.id === appState.activeChatId ? 'bg-blue-600/30 font-semibold' : ''}`;
-                item.textContent = chat.title;
-                item.onclick = () => {
+                const itemWrapper = document.createElement('div');
+                itemWrapper.className = `w-full flex items-center justify-between p-3 rounded-lg hover:bg-gray-700/50 transition-colors duration-200 group ${chat.id === appState.activeChatId ? 'bg-blue-600/30' : ''}`;
+                
+                const chatButton = document.createElement('button');
+                chatButton.className = 'flex-grow text-left truncate text-sm font-semibold';
+                chatButton.textContent = chat.title;
+                chatButton.onclick = () => {
                     appState.activeChatId = chat.id;
                     renderActiveChat();
                     renderChatHistoryList();
@@ -879,7 +881,64 @@ document.addEventListener('DOMContentLoaded', () => {
                         document.getElementById('sidebar-backdrop')?.classList.add('hidden');
                     }
                 };
-                listEl.appendChild(item);
+
+                const actionsContainer = document.createElement('div');
+                actionsContainer.className = 'flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity';
+
+                // Rename Button
+                const renameBtn = document.createElement('button');
+                renameBtn.className = 'p-1 rounded-full hover:bg-blue-500/20 text-blue-400';
+                renameBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>';
+                renameBtn.onclick = (e) => {
+                    e.stopPropagation(); // Prevent opening chat when clicking the button
+                    const newTitle = prompt("Enter a new name for this chat:", chat.title);
+                    if (newTitle && newTitle.trim() !== chat.title) {
+                        apiCall('/api/chat/rename', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ chat_id: chat.id, title: newTitle.trim() }),
+                        }).then(result => {
+                            if (result.success) {
+                                appState.chats[chat.id].title = newTitle.trim();
+                                renderChatHistoryList();
+                                if (appState.activeChatId === chat.id) {
+                                    document.getElementById('chat-title').textContent = newTitle.trim();
+                                }
+                                showToast("Chat renamed!", "success");
+                            }
+                        });
+                    }
+                };
+                actionsContainer.appendChild(renameBtn);
+
+                // Delete Button
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'p-1 rounded-full hover:bg-red-500/20 text-red-400';
+                deleteBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg>';
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation(); // Prevent opening chat when clicking the button
+                    if (confirm("Are you sure you want to delete this chat? This action cannot be undone.")) {
+                        apiCall('/api/chat/delete', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ chat_id: chat.id }),
+                        }).then(result => {
+                            if (result.success) {
+                                delete appState.chats[chat.id];
+                                const sortedChatIds = Object.keys(appState.chats).sort((a, b) => (appState.chats[b].created_at || '').localeCompare(appState.chats[a].created_at || ''));
+                                appState.activeChatId = sortedChatIds.length > 0 ? sortedChatIds[0] : null;
+                                renderChatHistoryList();
+                                renderActiveChat();
+                                showToast("Chat deleted.", "success");
+                            }
+                        });
+                    }
+                };
+                actionsContainer.appendChild(deleteBtn);
+
+                itemWrapper.appendChild(chatButton);
+                itemWrapper.appendChild(actionsContainer);
+                listEl.appendChild(itemWrapper);
             });
     }
 
@@ -994,6 +1053,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showToast("Could not start a new chat session.", "error");
                 return;
             }
+            renderActiveChat(); // Update UI after new chat is created
         }
         
         if (appState.chats[appState.activeChatId]?.messages.length === 0) {
@@ -1049,6 +1109,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 aiContentEl.innerHTML = DOMPurify.sanitize(marked.parse(fullResponse + '<span class="animate-pulse">▍</span>'));
                 if(chatWindow) chatWindow.scrollTop = chatWindow.scrollHeight;
             }
+            
+            // Handle case of empty response from Gemini API
+            if (!fullResponse.trim()) {
+                fullResponse = "I'm sorry, I couldn't generate a response. Please try again.";
+            }
+
             aiContentEl.innerHTML = DOMPurify.sanitize(marked.parse(fullResponse));
             renderCodeCopyButtons();
 
@@ -1646,7 +1712,7 @@ def chat_api():
 
         # --- History and File Handling ---
         # Optimized history: send only last 10 messages to save tokens
-        history = [{"role": "user" if msg['sender'] == 'user' else 'model', "parts": [{"text": msg['content']}]} for msg in chat['messages'][-10:]]
+        history = [{"role": "user" if msg['sender'] == 'user' else 'model', "parts": [{"text": msg['content']}]} for msg in chat['messages'][-10:] if msg.get('content')]
         
         model_input_parts = []
         if prompt:
@@ -1690,7 +1756,8 @@ def chat_api():
 
             if not full_response_text.strip():
                 logging.info(f"Received an empty response for chat {chat_id}.")
-                return
+                full_response_text = "I'm sorry, I couldn't generate a response. Please try again."
+                yield full_response_text
 
             chat['messages'].append({'sender': 'user', 'content': prompt})
             chat['messages'].append({'sender': 'model', 'content': full_response_text})
