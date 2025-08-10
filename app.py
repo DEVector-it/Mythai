@@ -24,16 +24,29 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a-very-secret-and-long-
 DATABASE_FILE = 'database.json'
 
 # --- Site & API Configuration ---
+# IMPORTANT: For the application to function correctly, you must create a .env file
+# in the same directory as this script and add your secret keys.
+# Example .env file:
+# GEMINI_API_KEY="your_gemini_api_key_here"
+# STRIPE_SECRET_KEY="sk_test_your_stripe_secret_key_here"
+
 SITE_CONFIG = {
     "GEMINI_API_KEY": os.environ.get("GEMINI_API_KEY"),
-    "STRIPE_SECRET_KEY": os.environ.get('STRIPE_SECRET_KEY', 'sk_test_51Ru4xPBSm9qhr9EvjpPnirDK8YhBI8ddhYhdstvnLCT1fIvea33ldQ3uGR2s6lnC1139diLglX3UUjPMMW17xxdS00gQ4jfOkR'),
+    "STRIPE_SECRET_KEY": os.environ.get('STRIPE_SECRET_KEY'),
     "STRIPE_PUBLIC_KEY": os.environ.get('STRIPE_PUBLIC_KEY', 'pk_test_51Ru4xPBSm9qhr9Ev02LOLySoFIztGhmrgUebvTUJtaRO9TFVJE0GwXSlNe3Nd489WpxmrQNIzIoRAxfuhtE0f24o00e6WUfhCb'),
-    "STRIPE_PRO_PRICE_ID": os.environ.get('STRIPE_PRO_PRICE_ID', 'price_1POfnCRx6a2y2gVv2W1z3xYj'), # Replace with your actual ID
-    "STRIPE_ULTRA_PRICE_ID": os.environ.get('STRIPE_ULTRA_PRICE_ID', 'price_1POfnlRx6a2y2gVvD9C8x7Za'), # Replace with your actual ID
-    "STRIPE_PLUS_PRICE_ID": os.environ.get('STRIPE_PLUS_PRICE_ID', 'price_1POfnxRx6a2y2gVvZbA9b8Xc'), # Replace with your actual ID
+    
+    # IMPORTANT: You must create Products in your Stripe Dashboard and replace these placeholder IDs.
+    # Go to your Stripe Dashboard -> Products -> Add Product.
+    # For Pro and Plus, create a recurring monthly price. For Ultra, create a one-time price.
+    # After creating a product and its price, copy the "Price ID" (e.g., price_123...) here.
+    "STRIPE_PRO_PRICE_ID": os.environ.get('STRIPE_PRO_PRICE_ID', 'YOUR_PRO_PRICE_ID_HERE'),
+    "STRIPE_ULTRA_PRICE_ID": os.environ.get('STRIPE_ULTRA_PRICE_ID', 'YOUR_ULTRA_PRICE_ID_HERE'),
+    "STRIPE_PLUS_PRICE_ID": os.environ.get('STRIPE_PLUS_PRICE_ID', 'YOUR_PLUS_PRICE_ID_HERE'),
+    
     "YOUR_DOMAIN": os.environ.get('YOUR_DOMAIN', 'http://localhost:5000'),
     "SECRET_REGISTRATION_KEY": os.environ.get('SECRET_REGISTRATION_KEY', 'SUPER_SECRET_KEY_123')
 }
+
 
 # --- API Initialization ---
 GEMINI_API_CONFIGURED = False
@@ -1671,4 +1684,4 @@ def impersonate_user():
 # --- Main Execution ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
- to the c
+ to th
