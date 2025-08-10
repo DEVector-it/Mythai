@@ -20,33 +20,21 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # --- Application Setup ---
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a-very-secret-and-long-random-key-for-myth-ai-v6-safe')
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a-very-secret-and-long-random-key-for-myth-ai-v9-student-focus')
 DATABASE_FILE = 'database.json'
 
 # --- Site & API Configuration ---
-# IMPORTANT: For the application to function correctly, you must create a .env file
-# in the same directory as this script and add your secret keys.
-# Example .env file:
-# GEMINI_API_KEY="your_gemini_api_key_here"
-# STRIPE_SECRET_KEY="sk_test_your_stripe_secret_key_here"
-
 SITE_CONFIG = {
     "GEMINI_API_KEY": os.environ.get("GEMINI_API_KEY"),
     "STRIPE_SECRET_KEY": os.environ.get('STRIPE_SECRET_KEY'),
     "STRIPE_PUBLIC_KEY": os.environ.get('STRIPE_PUBLIC_KEY', 'pk_test_51Ru4xPBSm9qhr9Ev02LOLySoFIztGhmrgUebvTUJtaRO9TFVJE0GwXSlNe3Nd489WpxmrQNIzIoRAxfuhtE0f24o00e6WUfhCb'),
-    
-    # IMPORTANT: You must create Products in your Stripe Dashboard and replace these placeholder IDs.
-    # Go to your Stripe Dashboard -> Products -> Add Product.
-    # For Pro and Plus, create a recurring monthly price. For Ultra, create a one-time price.
-    # After creating a product and its price, copy the "Price ID" (e.g., price_123...) here.
-    "STRIPE_PRO_PRICE_ID": os.environ.get('STRIPE_PRO_PRICE_ID', 'YOUR_PRO_PRICE_ID_HERE'),
-    "STRIPE_ULTRA_PRICE_ID": os.environ.get('STRIPE_ULTRA_PRICE_ID', 'YOUR_ULTRA_PRICE_ID_HERE'),
-    "STRIPE_PLUS_PRICE_ID": os.environ.get('STRIPE_PLUS_PRICE_ID', 'YOUR_PLUS_PRICE_ID_HERE'),
-    
+    "STRIPE_PRO_PRICE_ID": os.environ.get('STRIPE_PRO_PRICE_ID', 'price_1POfnCRx6a2y2gVv2W1z3xYj'),
+    "STRIPE_ULTRA_PRICE_ID": os.environ.get('STRIPE_ULTRA_PRICE_ID', 'price_1POfnlRx6a2y2gVvD9C8x7Za'),
+    "STRIPE_STUDENT_PRICE_ID": os.environ.get('STRIPE_STUDENT_PRICE_ID', 'price_1POfnxRx6a2y2gVvZbA9b8Xc'),
     "YOUR_DOMAIN": os.environ.get('YOUR_DOMAIN', 'http://localhost:5000'),
-    "SECRET_REGISTRATION_KEY": os.environ.get('SECRET_REGISTRATION_KEY', 'SUPER_SECRET_KEY_123')
+    "SECRET_REGISTRATION_KEY": os.environ.get('SECRET_REGISTRATION_KEY', 'SUPER_SECRET_KEY_123'),
+    "SECRET_STUDENT_KEY": os.environ.get('SECRET_STUDENT_KEY', 'STUDENT_SECRET_KEY_789') # New key for student signup
 }
-
 
 # --- API Initialization ---
 GEMINI_API_CONFIGURED = False
@@ -65,7 +53,7 @@ if not stripe.api_key:
 
 
 # --- 2. Database Management ---
-DB = { "users": {}, "chats": {}, "site_settings": {"announcement": "Welcome to the secure MythAI!"}, "ads": {} }
+DB = { "users": {}, "chats": {}, "site_settings": {"announcement": "Welcome! Student signup is now available on a separate page."}, "ads": {} }
 
 def save_database():
     """Saves the in-memory DB to a JSON file atomically."""
@@ -116,7 +104,7 @@ class User(UserMixin):
         self.password_hash = password_hash
         self.role = role
         self.plan = plan
-        self.account_type = account_type
+        self.account_type = account_type # 'general' or 'student'
         self.daily_messages = daily_messages
         self.last_message_date = last_message_date or datetime.now().strftime("%Y-%m-%d")
 
@@ -172,10 +160,10 @@ with app.app_context():
 
 # --- 4. Plan & Rate Limiting Configuration ---
 PLAN_CONFIG = {
-    "free": {"message_limit": 15, "can_upload": False},
-    "pro": {"message_limit": 50, "can_upload": True},
-    "ultra": {"message_limit": 10000, "can_upload": True},
-    "plus": {"message_limit": 100, "can_upload": True}
+    "free": {"message_limit": 15, "can_upload": False, "model": "gemini-1.5-flash-latest"},
+    "pro": {"message_limit": 50, "can_upload": True, "model": "gemini-1.5-pro-latest"},
+    "ultra": {"message_limit": 10000, "can_upload": True, "model": "gemini-1.5-pro-latest"},
+    "student": {"message_limit": 100, "can_upload": True, "model": "gemini-1.5-flash-latest"}
 }
 
 # Simple in-memory rate limiting
@@ -199,7 +187,6 @@ def rate_limited(f):
         ip = request.remote_addr
         now = time.time()
         
-        # Clean up old entries
         rate_limit_store[ip] = [t for t in rate_limit_store.get(ip, []) if now - t < RATE_LIMIT_WINDOW]
         
         if len(rate_limit_store.get(ip, [])) >= RATE_LIMIT_MAX_ATTEMPTS:
@@ -252,21 +239,25 @@ HTML_CONTENT = """
         .copy-code-btn { position: absolute; top: 0.5rem; right: 0.5rem; background-color: #374151; color: white; border: none; padding: 0.25rem 0.5rem; border-radius: 0.25rem; cursor: pointer; opacity: 0; transition: opacity 0.2s; font-size: 0.75rem; }
         pre:hover .copy-code-btn { opacity: 1; }
         #sidebar.hidden { transform: translateX(-100%); }
-        /* MythAI Plus Theme */
-        .plus-mode { background-color: #0d1e3e; color: #c8dcf7; }
-        .plus-mode #sidebar { background: rgba(13, 30, 62, 0.7); }
-        .plus-mode #chat-window { color: #c8dcf7; }
-        .plus-mode .glassmorphism { background: rgba(20, 47, 92, 0.5); border-color: rgba(67, 126, 235, 0.2); }
-        .plus-mode .brand-gradient { background-image: linear-gradient(to right, #2dd4bf, #38bdf8); }
-        .plus-mode #send-btn { background-image: linear-gradient(to right, #2dd4bf, #38bdf8); }
-        .plus-mode #user-input { color: #c8dcf7; }
-        .plus-mode #user-input::placeholder { color: #60a5fa; }
-        .plus-mode .message-wrapper .font-bold { color: #93c5fd; }
-        .plus-mode .ai-avatar { background-image: linear-gradient(to right, #2dd4bf, #38bdf8); }
-        .plus-mode ::-webkit-scrollbar-track { background: #0d1e3e; }
-        .plus-mode ::-webkit-scrollbar-thumb { background: #1e40af; }
-        .plus-mode #sidebar button:hover { background-color: rgba(30, 64, 175, 0.3); }
-        .plus-mode #sidebar .bg-blue-600\\/30 { background-color: rgba(59, 130, 246, 0.4); }
+        /* Study Buddy Theme */
+        .study-buddy-mode { background-color: #052e16; color: #a7f3d0; }
+        .study-buddy-mode #sidebar { background: rgba(4, 26, 13, 0.7); }
+        .study-buddy-mode #chat-window { color: #d1fae5; }
+        .study-buddy-mode .glassmorphism { background: rgba(2, 44, 34, 0.5); border-color: rgba(52, 211, 153, 0.2); }
+        .study-buddy-mode .brand-gradient { background-image: linear-gradient(to right, #34d399, #22c55e); }
+        .study-buddy-mode #send-btn { background-image: linear-gradient(to right, #10b981, #22c55e); }
+        .study-buddy-mode #user-input { color: #d1fae5; }
+        .study-buddy-mode #user-input::placeholder { color: #6ee7b7; }
+        .study-buddy-mode .message-wrapper .font-bold { color: #a7f3d0; }
+        .study-buddy-mode .ai-avatar { background-image: linear-gradient(to right, #34d399, #22c55e); }
+        .study-buddy-mode ::-webkit-scrollbar-track { background: #064e3b; }
+        .study-buddy-mode ::-webkit-scrollbar-thumb { background: #047857; }
+        .study-buddy-mode #sidebar button:hover { background-color: rgba(5, 150, 105, 0.3); }
+        .study-buddy-mode #sidebar .bg-blue-600\\/30 { background-color: rgba(16, 185, 129, 0.4); }
+        .typing-indicator span { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: currentColor; margin: 0 2px; animation: typing-bounce 1.4s infinite ease-in-out both; }
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes typing-bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1.0); } }
     </style>
 </head>
 <body class="font-sans text-gray-200 antialiased">
@@ -289,6 +280,12 @@ HTML_CONTENT = """
         </svg>
     </template>
 
+    <template id="template-study-buddy-logo">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a10 10 0 0 0-10 10c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85v2.74c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2z"/>
+        </svg>
+    </template>
+
     <template id="template-auth-page">
         <div class="flex flex-col items-center justify-center h-full w-full bg-gray-900 p-4">
             <div class="w-full max-w-md glassmorphism rounded-2xl p-8 shadow-2xl animate-scale-up">
@@ -304,15 +301,6 @@ HTML_CONTENT = """
                         <label for="password" class="block text-sm font-medium text-gray-300 mb-1">Password</label>
                         <input type="password" id="password" name="password" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" required>
                     </div>
-                    <div id="signup-fields" class="hidden">
-                        <div class="mb-4">
-                            <label for="account_type" class="block text-sm font-medium text-gray-300 mb-1">Account Type</label>
-                             <select id="account_type" name="account_type" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600">
-                                <option value="general">General User</option>
-                                <option value="plus_user">MythAI Plus User</option>
-                            </select>
-                        </div>
-                    </div>
                     <button type="submit" id="auth-submit-btn" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-90 text-white font-bold py-3 px-4 rounded-lg transition-opacity">Login</button>
                     <p id="auth-error" class="text-red-400 text-sm text-center h-4 mt-3"></p>
                 </form>
@@ -321,7 +309,38 @@ HTML_CONTENT = """
                 </div>
             </div>
              <div class="text-center mt-4 flex justify-center gap-4">
+                <button id="student-signup-link" class="text-xs text-gray-500 hover:text-gray-400">Student Sign Up</button>
                 <button id="special-auth-link" class="text-xs text-gray-500 hover:text-gray-400">Admin & Ad Portal</button>
+                <button id="privacy-policy-link" class="text-xs text-gray-500 hover:text-gray-400">Privacy Policy</button>
+            </div>
+        </div>
+    </template>
+    
+    <template id="template-student-signup-page">
+        <div class="flex flex-col items-center justify-center h-full w-full bg-gray-900 p-4">
+            <div class="w-full max-w-md glassmorphism rounded-2xl p-8 shadow-2xl animate-scale-up">
+                <div class="flex justify-center mb-6" id="student-signup-logo-container"></div>
+                <h2 class="text-3xl font-bold text-center text-white mb-2">Student Account Signup</h2>
+                <p class="text-gray-400 text-center mb-8">Create a student account to access Study Buddy mode.</p>
+                <form id="student-signup-form">
+                    <div class="mb-4">
+                        <label for="student-username" class="block text-sm font-medium text-gray-300 mb-1">Username</label>
+                        <input type="text" id="student-username" name="username" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="student-password" class="block text-sm font-medium text-gray-300 mb-1">Password</label>
+                        <input type="password" id="student-password" name="password" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" required>
+                    </div>
+                    <div class="mb-6">
+                        <label for="student-secret-key" class="block text-sm font-medium text-gray-300 mb-1">Student Access Key</label>
+                        <input type="password" id="student-secret-key" name="secret_key" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" required>
+                    </div>
+                    <button type="submit" class="w-full bg-gradient-to-r from-green-500 to-teal-500 hover:opacity-90 text-white font-bold py-3 px-4 rounded-lg">Create Student Account</button>
+                    <p id="student-signup-error" class="text-red-400 text-sm text-center h-4 mt-3"></p>
+                </form>
+            </div>
+            <div class="text-center mt-4">
+                <button id="back-to-main-login" class="text-xs text-gray-500 hover:text-gray-400">Back to Main Login</button>
             </div>
         </div>
     </template>
@@ -333,7 +352,7 @@ HTML_CONTENT = """
                     <div id="app-logo-container"></div>
                     <h1 class="text-2xl font-bold brand-gradient">Myth AI</h1>
                 </div>
-                <div id="plus-mode-toggle-container" class="hidden flex-shrink-0 p-2 mb-2"></div>
+                <div id="student-mode-toggle-container" class="hidden flex-shrink-0 p-2 mb-2"></div>
                 
                 <div class="flex-shrink-0"><button id="new-chat-btn" class="w-full text-left flex items-center gap-3 p-3 rounded-lg hover:bg-gray-700/50 transition-colors duration-200"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14" /><path d="M5 12h14" /></svg> New Chat</button></div>
                 <div id="chat-history-list" class="flex-grow overflow-y-auto my-4 space-y-1 pr-1"></div>
@@ -341,20 +360,6 @@ HTML_CONTENT = """
                 <!-- AdSense Placeholder Start -->
                 <div id="adsense-container" class="p-2 mt-auto">
                     <!-- Your Google AdSense ad unit code goes here -->
-                    <!-- Example: -->
-                    <!-- 
-                    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-your_client_id"
-                         crossorigin="anonymous"></script>
-                    <ins class="adsbygoogle"
-                         style="display:block"
-                         data-ad-client="ca-pub-your_client_id"
-                         data-ad-slot="your_ad_slot_id"
-                         data-ad-format="auto"
-                         data-full-width-responsive="true"></ins>
-                    <script>
-                         (adsbygoogle = window.adsbygoogle || []).push({});
-                    </script>
-                    -->
                     <div class="w-full h-24 bg-gray-700/50 rounded-lg flex items-center justify-center text-gray-400 text-sm">
                         Ad Placeholder
                     </div>
@@ -363,6 +368,11 @@ HTML_CONTENT = """
 
                 <div class="flex-shrink-0 border-t border-gray-700 pt-2 space-y-1">
                     <div id="user-info" class="p-3 text-sm"></div>
+                    <div id="student-features" class="hidden space-y-1">
+                         <button id="practice-mode-btn" class="w-full text-left flex items-center gap-3 p-3 rounded-lg hover:bg-green-500/20 text-green-400 transition-colors duration-200">Practice Mode</button>
+                         <button id="leaderboard-btn" class="w-full text-left flex items-center gap-3 p-3 rounded-lg hover:bg-green-500/20 text-green-400 transition-colors duration-200">Leaderboard</button>
+                         <button id="top-student-btn" class="w-full text-left flex items-center gap-3 p-3 rounded-lg hover:bg-green-500/20 text-green-400 transition-colors duration-200">Top Student</button>
+                    </div>
                     <button id="upgrade-plan-btn" class="w-full text-left flex items-center gap-3 p-3 rounded-lg hover:bg-indigo-500/20 text-indigo-400 transition-colors duration-200"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6v12m-6-6h12"/></svg> Upgrade Plan</button>
                     <button id="logout-btn" class="w-full text-left flex items-center gap-3 p-3 rounded-lg hover:bg-red-500/20 text-red-400 transition-colors duration-200"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></svg> Logout</button>
                 </div>
@@ -443,7 +453,7 @@ HTML_CONTENT = """
                 <div class="p-6 glassmorphism rounded-lg"><h2 class="text-gray-400 text-lg">Total Users</h2><p id="admin-total-users" class="text-4xl font-bold text-white">0</p></div>
                 <div class="p-6 glassmorphism rounded-lg"><h2 class="text-gray-400 text-lg">Pro Users</h2><p id="admin-pro-users" class="text-4xl font-bold text-white">0</p></div>
                 <div class="p-6 glassmorphism rounded-lg"><h2 class="text-gray-400 text-lg">Ultra Users</h2><p id="admin-ultra-users" class="text-4xl font-bold text-white">0</p></div>
-                <div class="p-6 glassmorphism rounded-lg"><h2 class="text-gray-400 text-lg">Plus Users</h2><p id="admin-plus-users" class="text-4xl font-bold text-white">0</p></div>
+                <div class="p-6 glassmorphism rounded-lg"><h2 class="text-gray-400 text-lg">Student Users</h2><p id="admin-student-users" class="text-4xl font-bold text-white">0</p></div>
             </div>
 
             <div class="p-6 glassmorphism rounded-lg">
@@ -1708,6 +1718,7 @@ def impersonate_user():
 # --- Main Execution ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
+
 
 
 
