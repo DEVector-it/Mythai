@@ -1343,12 +1343,10 @@ def signup():
     
     username = data.get('username', '').strip()
     password = data.get('password', '')
-    account_type = data.get('account_type', 'general')
+    account_type = 'general' # General signup is always general
 
-    if not all([username, password, account_type]) or len(username) < 3 or len(password) < 6:
+    if not all([username, password]) or len(username) < 3 or len(password) < 6:
         return jsonify({"error": "Username (min 3 chars) and password (min 6 chars) are required."}), 400
-    if account_type not in ['general', 'plus_user']:
-        return jsonify({"error": "Invalid account type."}), 400
     if User.get_by_username(username):
         return jsonify({"error": "Username already exists."}), 409
     
@@ -1363,6 +1361,37 @@ def signup():
         })
     except Exception as e:
         logging.error(f"Error during signup for {username}: {e}")
+        return jsonify({"error": "An internal server error occurred during signup."}), 500
+
+@app.route('/api/student_signup', methods=['POST'])
+@rate_limited
+def student_signup():
+    data = request.get_json()
+    if not data: return jsonify({"error": "Invalid request format."}), 400
+    
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+    secret_key = data.get('secret_key')
+
+    if secret_key != SITE_CONFIG["SECRET_STUDENT_KEY"]:
+        return jsonify({"error": "Invalid student access key."}), 403
+    if not all([username, password]) or len(username) < 3 or len(password) < 6:
+        return jsonify({"error": "Username (min 3 chars) and password (min 6 chars) are required."}), 400
+    if User.get_by_username(username):
+        return jsonify({"error": "Username already exists."}), 409
+    
+    try:
+        # New student users are created with the 'student' account type and plan
+        new_user = User(id=username, username=username, password_hash=generate_password_hash(password), account_type='student', plan='student')
+        DB['users'][new_user.id] = new_user
+        save_database()
+        login_user(new_user, remember=True)
+        return jsonify({
+            "success": True, "user": get_user_data_for_frontend(new_user),
+            "chats": {}, "settings": DB['site_settings']
+        })
+    except Exception as e:
+        logging.error(f"Error during student signup for {username}: {e}")
         return jsonify({"error": "An internal server error occurred during signup."}), 500
 
 @app.route('/api/login', methods=['POST'])
@@ -1432,7 +1461,7 @@ def chat_api():
         data = request.form
         chat_id = data.get('chat_id')
         prompt = data.get('prompt', '').strip()
-        is_plus_mode = data.get('is_plus_mode') == 'true'
+        is_student_mode = data.get('is_student_mode') == 'true'
         
         if not chat_id:
             return jsonify({"error": "Missing chat identifier."}), 400
@@ -1448,10 +1477,10 @@ def chat_api():
         
         # --- Context and Persona Injection ---
         current_time = datetime.now().strftime('%A, %B %d, %Y at %I:%M %p')
-        base_system_instruction = f"The current date and time is {current_time}. The user is located in Yorkton, Saskatchewan, Canada."
+        base_system_instruction = f"The current date and time is {current_time}. The user is located in Yorkton, Saskatchewan, Canada. Your developer is devector me."
         
-        if is_plus_mode and current_user.account_type == 'plus_user':
-            persona_instruction = "You are MythAI Plus, a premium, enhanced AI assistant. Your goal is to provide faster, more detailed, and more insightful answers. You have access to advanced tools and knowledge. Be proactive and thorough."
+        if is_student_mode and current_user.account_type == 'student':
+            persona_instruction = "You are Study Buddy, a friendly and encouraging tutor. Your goal is to guide the user to the answer without giving it away directly. Ask leading questions, explain concepts simply, and help them break down the problem. Never just provide the final answer."
         else:
             persona_instruction = "You are Myth AI, a powerful, general-purpose assistant for creative tasks, coding, and complex questions."
             
@@ -1484,7 +1513,7 @@ def chat_api():
             return jsonify({"error": "A prompt or file is required."}), 400
 
         # --- Gemini API Call ---
-        model = genai.GenerativeModel('gemini-1.5-flash-latest', system_instruction=final_system_instruction)
+        model = genai.GenerativeModel(plan_details['model'], system_instruction=final_system_instruction)
         chat_session = model.start_chat(history=history)
 
         def generate_chunks():
@@ -1604,7 +1633,7 @@ def get_plans():
         "free": {"name": "Free", "price_string": "Free", "features": ["15 Daily Messages", "Standard Model Access"], "color": "text-gray-300"},
         "pro": {"name": "Pro", "price_string": "$9.99 / month", "features": ["50 Daily Messages", "Image Uploads", "Priority Support"], "color": "text-indigo-400"},
         "ultra": {"name": "Ultra", "price_string": "$100 one-time", "features": ["Unlimited Messages", "Image Uploads", "Access to All Models"], "color": "text-purple-400"},
-        "plus": {"name": "MythAI Plus", "price_string": "$4.99 / month", "features": ["100 Daily Messages", "Image Uploads", "Enhanced AI Persona"], "color": "text-cyan-400"}
+        "student": {"name": "Student", "price_string": "$4.99 / month", "features": ["100 Daily Messages", "Image Uploads", "Study Buddy Persona"], "color": "text-green-400"}
     }
     return jsonify({
         "success": True, "plans": plans, "user_plan": current_user.plan,
@@ -1621,7 +1650,7 @@ def create_checkout_session():
     price_map = {
         "pro": {"id": SITE_CONFIG["STRIPE_PRO_PRICE_ID"], "mode": "subscription"},
         "ultra": {"id": SITE_CONFIG["STRIPE_ULTRA_PRICE_ID"], "mode": "payment"},
-        "plus": {"id": SITE_CONFIG["STRIPE_PLUS_PRICE_ID"], "mode": "subscription"}
+        "student": {"id": SITE_CONFIG["STRIPE_STUDENT_PRICE_ID"], "mode": "subscription"}
     }
     if plan_id not in price_map:
         return jsonify(error={'message': 'Invalid plan selected.'}), 400
@@ -1643,7 +1672,7 @@ def create_checkout_session():
 @login_required
 def payment_success():
     plan = request.args.get('plan')
-    if plan in ['pro', 'ultra', 'plus']:
+    if plan in ['pro', 'ultra', 'student']:
         current_user.plan = plan
         save_database()
     return redirect('/?payment=success')
@@ -1659,13 +1688,13 @@ def payment_cancel():
 @admin_required
 def admin_data():
     all_users_data = []
-    stats = {"total_users": 0, "pro_users": 0, "ultra_users": 0, "plus_users": 0}
+    stats = {"total_users": 0, "pro_users": 0, "ultra_users": 0, "student_users": 0}
     for user in DB["users"].values():
         if user.role != 'admin':
             stats['total_users'] += 1
             if user.plan == 'pro': stats['pro_users'] += 1
             elif user.plan == 'ultra': stats['ultra_users'] += 1
-            elif user.plan == 'plus': stats['plus_users'] += 1
+            elif user.plan == 'student': stats['student_users'] += 1
             
             all_users_data.append({
                 "id": user.id, "username": user.username, "plan": user.plan,
@@ -1718,6 +1747,7 @@ def impersonate_user():
 # --- Main Execution ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
+
 
 
 
