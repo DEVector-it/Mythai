@@ -330,7 +330,7 @@ HTML_CONTENT = """
             <div class="w-full max-w-md glassmorphism rounded-2xl p-8 shadow-2xl animate-scale-up">
                 <div class="flex justify-center mb-6" id="student-signup-logo-container"></div>
                 <h2 class="text-3xl font-bold text-center text-white mb-2">Student Account Signup</h2>
-                <p class="text-gray-400 text-center mb-8">Create a student account to access Study Buddy mode.</p>
+                <p class="text-gray-400 text-center mb-8">Create a student account to join a classroom.</p>
                 <form id="student-signup-form">
                     <div class="mb-4">
                         <label for="student-username" class="block text-sm font-medium text-gray-300 mb-1">Username</label>
@@ -985,7 +985,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             body: JSON.stringify({ chat_id: chat.id }),
                         }).then(result => {
                             if (result.success) {
-                                delete appState.chats[chat.id];
+                                delete appState.chats[appState.activeChatId];
                                 const sortedChatIds = Object.keys(appState.chats).sort((a, b) => (appState.chats[b].created_at || '').localeCompare(appState.chats[a].created_at || ''));
                                 appState.activeChatId = sortedChatIds.length > 0 ? sortedChatIds[0] : null;
                                 renderChatHistoryList();
@@ -1108,90 +1108,92 @@ document.addEventListener('DOMContentLoaded', () => {
         const prompt = userInput.value.trim();
         if ((!prompt && !appState.uploadedFile) || appState.isAITyping) return;
 
-        if (!appState.activeChatId) {
-            const chatCreated = await createNewChat(false);
-            if (!chatCreated) {
-                showToast("Could not start a new chat session.", "error");
-                return;
-            }
-            renderActiveChat();
-        }
-        
-        if (appState.chats[appState.activeChatId]?.messages.length === 0) {
-            document.getElementById('chat-window').innerHTML = '';
-        }
-
-        const userMessage = { sender: 'user', content: prompt };
-        addMessageToDOM(userMessage);
-
-        const aiMessage = { sender: 'model', content: '' };
-        const aiContentEl = addMessageToDOM(aiMessage, true).querySelector('.message-content');
-
-        userInput.value = '';
-        userInput.style.height = 'auto';
-        
-        const fileToSend = appState.uploadedFile;
-        appState.uploadedFile = null;
-        updatePreviewContainer();
-
-        appState.isAITyping = true;
-        appState.abortController = new AbortController();
-        updateUIState();
-
         try {
-            const formData = new FormData();
-            formData.append('chat_id', appState.activeChatId);
-            formData.append('prompt', prompt);
-            formData.append('is_study_mode', appState.isStudyMode);
-            if (fileToSend) {
-                formData.append('file', fileToSend);
-            }
-
-            const response = await fetch('/api/chat', {
-                method: 'POST',
-                body: formData,
-                signal: appState.abortController.signal,
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                if (response.status === 401 && !errorData.logged_in) handleLogout(false);
-                throw new Error(errorData.error || `Server error: ${response.status}`);
-            }
-
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let fullResponse = '';
-            const chatWindow = document.getElementById('chat-window');
-
-            while (true) {
-                const { value, done } = await reader.read();
-                if (done) break;
-                const chunk = decoder.decode(value, {stream: true});
-                fullResponse += chunk;
-                aiContentEl.innerHTML = DOMPurify.sanitize(marked.parse(fullResponse + '<span class="animate-pulse">▍</span>'));
-                if(chatWindow) chatWindow.scrollTop = chatWindow.scrollHeight;
+            if (!appState.activeChatId) {
+                const chatCreated = await createNewChat(false);
+                if (!chatCreated) {
+                    showToast("Could not start a new chat session.", "error");
+                    return;
+                }
+                renderActiveChat();
             }
             
-            if (!fullResponse.trim()) {
-                fullResponse = "I'm sorry, I couldn't generate a response. Please try again.";
+            if (appState.chats[appState.activeChatId]?.messages.length === 0) {
+                document.getElementById('chat-window').innerHTML = '';
             }
 
-            aiContentEl.innerHTML = DOMPurify.sanitize(marked.parse(fullResponse));
-            renderCodeCopyButtons();
+            const userMessage = { sender: 'user', content: prompt };
+            addMessageToDOM(userMessage);
 
-            const updatedData = await apiCall('/api/status');
-            if (updatedData.success) {
-                appState.currentUser = updatedData.user;
-                appState.chats = updatedData.chats;
-                renderChatHistoryList();
-                updateUserInfo();
-                document.getElementById('chat-title').textContent = appState.chats[appState.activeChatId].title;
-            }
-        } catch (err) {
-            if (err.name !== 'AbortError') {
-                if (aiContentEl) aiContentEl.innerHTML = `<p class="text-red-400 mt-2"><strong>Error:</strong> ${err.message}</p>`;
-                showToast(err.message, 'error');
+            const aiMessage = { sender: 'model', content: '' };
+            const aiContentEl = addMessageToDOM(aiMessage, true).querySelector('.message-content');
+
+            userInput.value = '';
+            userInput.style.height = 'auto';
+            
+            const fileToSend = appState.uploadedFile;
+            appState.uploadedFile = null;
+            updatePreviewContainer();
+
+            appState.isAITyping = true;
+            appState.abortController = new AbortController();
+            updateUIState();
+
+            try {
+                const formData = new FormData();
+                formData.append('chat_id', appState.activeChatId);
+                formData.append('prompt', prompt);
+                formData.append('is_study_mode', appState.isStudyMode);
+                if (fileToSend) {
+                    formData.append('file', fileToSend);
+                }
+
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    body: formData,
+                    signal: appState.abortController.signal,
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    if (response.status === 401 && !errorData.logged_in) handleLogout(false);
+                    throw new Error(errorData.error || `Server error: ${response.status}`);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullResponse = '';
+                const chatWindow = document.getElementById('chat-window');
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    const chunk = decoder.decode(value, {stream: true});
+                    fullResponse += chunk;
+                    aiContentEl.innerHTML = DOMPurify.sanitize(marked.parse(fullResponse + '<span class="animate-pulse">▍</span>'));
+                    if(chatWindow) chatWindow.scrollTop = chatWindow.scrollHeight;
+                }
+                
+                if (!fullResponse.trim()) {
+                    fullResponse = "I'm sorry, I couldn't generate a response. Please try again.";
+                }
+
+                aiContentEl.innerHTML = DOMPurify.sanitize(marked.parse(fullResponse));
+                renderCodeCopyButtons();
+
+                const updatedData = await apiCall('/api/status');
+                if (updatedData.success) {
+                    appState.currentUser = updatedData.user;
+                    appState.chats = updatedData.chats;
+                    renderChatHistoryList();
+                    updateUserInfo();
+                    document.getElementById('chat-title').textContent = appState.chats[appState.activeChatId].title;
+                }
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    if (aiContentEl) aiContentEl.innerHTML = `<p class="text-red-400 mt-2"><strong>Error:</strong> ${err.message}</p>`;
+                    showToast(err.message, 'error');
+                }
             }
         } finally {
             appState.isAITyping = false;
@@ -1263,10 +1265,15 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const removeListeners = () => {
             appContainer.onclick = null;
-            document.getElementById('user-input').onkeydown = null;
-            document.getElementById('user-input').oninput = null;
-            document.getElementById('sidebar-backdrop').onclick = null;
-            document.getElementById('file-input').onchange = null;
+            const userInput = document.getElementById('user-input');
+            if (userInput) {
+                userInput.onkeydown = null;
+                userInput.oninput = null;
+            }
+            const backdrop = document.getElementById('sidebar-backdrop');
+            if (backdrop) backdrop.onclick = null;
+            const fileInput = document.getElementById('file-input');
+            if (fileInput) fileInput.onchange = null;
             const announcementForm = document.getElementById('announcement-form');
             if(announcementForm) announcementForm.onsubmit = null;
         };
@@ -1343,6 +1350,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (fileInput) {
                 fileInput.onchange = (e) => {
                     if (e.target.files.length > 0) {
+                        const planDetails = PLAN_CONFIG[appState.currentUser.plan] || PLAN_CONFIG['free'];
+                        if (!planDetails.can_upload) {
+                            showToast("Your current plan does not support image uploads.", "error");
+                            e.target.value = null;
+                            return;
+                        }
                         appState.uploadedFile = e.target.files[0];
                         updatePreviewContainer();
                     }
@@ -1786,13 +1799,10 @@ def student_signup():
     
     username = data.get('username', '').strip()
     password = data.get('password', '')
-    secret_key = data.get('secret_key')
     classroom_code = data.get('classroom_code', '').strip().upper()
 
-    if secret_key != SITE_CONFIG["SECRET_STUDENT_KEY"]:
-        return jsonify({"error": "Invalid student access key."}), 403
-    if not all([username, password]) or len(username) < 3 or len(password) < 6:
-        return jsonify({"error": "Username (min 3 chars) and password (min 6 chars) are required."}), 400
+    if not all([username, password, classroom_code]) or len(username) < 3 or len(password) < 6:
+        return jsonify({"error": "Username, password, and classroom code are required."}), 400
     if User.get_by_username(username):
         return jsonify({"error": "Username already exists."}), 409
     
@@ -1862,7 +1872,6 @@ def login():
 
 @app.route('/api/logout')
 def logout():
-    # If admin was impersonating, log them back in as themselves
     if 'impersonator_id' in session:
         impersonator = User.get(session['impersonator_id'])
         if impersonator:
@@ -1971,7 +1980,6 @@ def chat_api():
         if not model_input_parts:
             return jsonify({"error": "A prompt or file is required."}), 400
 
-        # Save user message and update count
         user_message_content = {
             'sender': 'user', 'content': prompt,
             'image_url': f"data:{uploaded_file.mimetype};base64,{img_base64}" if uploaded_file else None
@@ -1979,14 +1987,12 @@ def chat_api():
         chat['messages'].append(user_message_content)
         current_user.daily_messages += 1
         
-        # Update streak if in study mode and not already done today
         if is_study_mode and current_user.account_type == 'student' and current_user.last_streak_date != datetime.now().strftime("%Y-%m-%d"):
             current_user.streak += 1
             current_user.last_streak_date = datetime.now().strftime("%Y-%m-%d")
         
         save_database()
 
-        # Gemini API Call
         model = genai.GenerativeModel(plan_details['model'], system_instruction=final_system_instruction)
         chat_session = model.start_chat(history=history)
 
@@ -2089,13 +2095,43 @@ def view_shared_chat(chat_id):
     if not chat or not chat.get('is_public'):
         return "Chat not found or is not public.", 404
     
-    # Simple, safe HTML rendering
-    chat_html = f"<html><head><title>{chat['title']}</title></head><body><h1>{chat['title']}</h1>"
+    chat_html = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Shared Chat: {chat['title']}</title>
+        <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+        <style>
+            body {{ background-color: #1f2937; color: #f9fafb; font-family: sans-serif; }}
+            .chat-container {{ max-width: 800px; margin: auto; padding: 2rem; }}
+            .message-user {{ background-color: #3b82f6; color: white; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem; }}
+            .message-ai {{ background-color: #4b5563; color: white; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem; }}
+            .message-content img {{ max-width: 100%; height: auto; border-radius: 0.5rem; margin-top: 1rem; }}
+        </style>
+    </head>
+    <body>
+        <div class="chat-container">
+            <h1 class="text-3xl font-bold text-center mb-6">{chat['title']}</h1>
+            <p class="text-sm text-gray-400 text-center mb-6">This is a shared conversation from Myth AI.</p>
+    """
     for msg in chat['messages']:
-        sender = "<b>You:</b>" if msg['sender'] == 'user' else "<b>Myth AI:</b>"
-        content = msg['content'].replace('<', '&lt;').replace('>', '&gt;')
-        chat_html += f"<p>{sender} {content.replace('/n', '<br>')}</p><hr>"
-    chat_html += "</body></html>"
+        sender_class = 'message-user' if msg['sender'] == 'user' else 'message-ai'
+        sender_name = 'You' if msg['sender'] == 'user' else 'Myth AI'
+        content = msg.get('content', '').replace('<', '&lt;').replace('>', '&gt;').replace('\n', '<br>')
+        
+        chat_html += f"""
+            <div class="{sender_class}">
+                <strong>{sender_name}:</strong>
+                <div class="message-content">{content}</div>
+            </div>
+        """
+    chat_html += """
+        </div>
+    </body>
+    </html>
+    """
     return chat_html
 
 @app.route('/api/plans')
@@ -2258,16 +2294,10 @@ def impersonate_user():
 @teacher_required
 def teacher_dashboard_data():
     teacher_id = current_user.id
-    classroom_code = None
+    classroom_code = next((code for code, data in DB['classrooms'].items() if data.get('teacher_id') == teacher_id), None)
     
-    # Find the classroom code associated with the teacher
-    for code, classroom in DB['classrooms'].items():
-        if classroom.get('teacher_id') == teacher_id:
-            classroom_code = code
-            break
-            
     if not classroom_code:
-        return jsonify({"success": True, "classroom": {"code": None, "students": []}, "students": []})
+        return jsonify({"success": True, "classroom": {"code": None}, "students": []})
         
     classroom_students_ids = DB['classrooms'][classroom_code]['students']
     students_data = []
@@ -2280,9 +2310,8 @@ def teacher_dashboard_data():
         "success": True,
         "classroom": {
             "code": classroom_code,
-            "students": students_data
         },
-        "students": students_data
+        "students": sorted(students_data, key=lambda x: x['streak'], reverse=True)
     })
 
 @app.route('/api/teacher/generate_classroom_code', methods=['POST'])
@@ -2290,7 +2319,6 @@ def teacher_dashboard_data():
 def generate_classroom_code_api():
     teacher_id = current_user.id
     
-    # Check if a classroom already exists for this teacher
     existing_classroom_code = next((code for code, data in DB['classrooms'].items() if data['teacher_id'] == teacher_id), None)
     if existing_classroom_code:
         return jsonify({"error": "You already have a classroom. You can only have one."}), 409
@@ -2336,13 +2364,10 @@ def get_student_chats(student_id):
         
     student_chats = list(get_all_user_chats(student_id).values())
     
-    # We only send a simplified version of the chats to the frontend for display
     sanitized_chats = []
     for chat in student_chats:
         sanitized_messages = []
         for msg in chat['messages']:
-            # We don't want to expose raw images in a public-facing API for now
-            # so we only send the text content
             sanitized_messages.append({
                 "sender": msg['sender'],
                 "content": msg['content']
