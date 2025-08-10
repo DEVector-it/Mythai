@@ -13,58 +13,42 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 import stripe
 from PIL import Image
-from authlib.integrations.flask_client import OAuth
 
 # --- 1. Initial Configuration ---
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+# --- Security Check for Essential Keys ---
+REQUIRED_KEYS = ['SECRET_KEY', 'GEMINI_API_KEY', 'SECRET_REGISTRATION_KEY', 'SECRET_STUDENT_KEY', 'SECRET_TEACHER_KEY']
+for key in REQUIRED_KEYS:
+    if not os.environ.get(key):
+        logging.critical(f"CRITICAL ERROR: Environment variable '{key}' is not set. Application cannot start securely.")
+        exit(f"Error: Missing required environment variable '{key}'. Please set it in your .env file.")
+
 # --- Application Setup ---
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a-very-secret-and-long-random-key-for-myth-ai-v11-teacher')
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
 DATABASE_FILE = 'database.json'
 
 # --- Site & API Configuration ---
 SITE_CONFIG = {
     "GEMINI_API_KEY": os.environ.get("GEMINI_API_KEY"),
     "STRIPE_SECRET_KEY": os.environ.get('STRIPE_SECRET_KEY'),
-    "STRIPE_PUBLIC_KEY": os.environ.get('STRIPE_PUBLIC_KEY', 'pk_test_51Ru4xPBSm9qhr9Ev02LOLySoFIztGhmrgUebvTUJtaRO9TFVJE0GwXSlNe3Nd489WpxmrQNIzIoRAxfuhtE0f24o00e6WUfhCb'),
-    "STRIPE_PRO_PRICE_ID": os.environ.get('STRIPE_PRO_PRICE_ID', 'price_1POfnCRx6a2y2gVv2W1z3xYj'),
-    "STRIPE_ULTRA_PRICE_ID": os.environ.get('STRIPE_ULTRA_PRICE_ID', 'price_1POfnlRx6a2y2gVvD9C8x7Za'),
-    "STRIPE_STUDENT_PRICE_ID": os.environ.get('STRIPE_STUDENT_PRICE_ID', 'price_1POfnxRx6a2y2gVvZbA9b8Xc'),
+    "STRIPE_PUBLIC_KEY": os.environ.get('STRIPE_PUBLIC_KEY'),
+    "STRIPE_PRO_PRICE_ID": os.environ.get('STRIPE_PRO_PRICE_ID'),
+    "STRIPE_ULTRA_PRICE_ID": os.environ.get('STRIPE_ULTRA_PRICE_ID'),
+    "STRIPE_STUDENT_PRICE_ID": os.environ.get('STRIPE_STUDENT_PRICE_ID'),
     "YOUR_DOMAIN": os.environ.get('YOUR_DOMAIN', 'http://localhost:5000'),
-    "SECRET_REGISTRATION_KEY": os.environ.get('SECRET_REGISTRATION_KEY', 'SUPER_SECRET_KEY_123'),
-    "SECRET_STUDENT_KEY": os.environ.get('SECRET_STUDENT_KEY', 'STUDENT_SECRET_KEY_789'),
-    "SECRET_TEACHER_KEY": os.environ.get('SECRET_TEACHER_KEY', 'TEACHER_SECRET_KEY_456'),
-    "GOOGLE_CLIENT_ID": os.environ.get("GOOGLE_CLIENT_ID"),
-    "GOOGLE_CLIENT_SECRET": os.environ.get("GOOGLE_CLIENT_SECRET"),
+    "SECRET_REGISTRATION_KEY": os.environ.get('SECRET_REGISTRATION_KEY'),
+    "SECRET_STUDENT_KEY": os.environ.get('SECRET_STUDENT_KEY'),
+    "SECRET_TEACHER_KEY": os.environ.get('SECRET_TEACHER_KEY'),
 }
-
-# --- OAuth Initialization ---
-oauth = OAuth(app)
-google = oauth.register(
-    name='google',
-    client_id=SITE_CONFIG["GOOGLE_CLIENT_ID"],
-    client_secret=SITE_CONFIG["GOOGLE_CLIENT_SECRET"],
-    access_token_url='https://accounts.google.com/o/oauth2/token',
-    access_token_params=None,
-    authorize_url='https://accounts.google.com/o/oauth2/auth',
-    authorize_params=None,
-    api_base_url='https://www.googleapis.com/oauth2/v1/',
-    userinfo_endpoint='https://openidconnect.googleapis.com/v1/userinfo',
-    client_kwargs={'scope': 'openid email profile'},
-    jwks_uri="https://www.googleapis.com/oauth2/v3/certs",
-)
-
 
 # --- API Initialization ---
 GEMINI_API_CONFIGURED = False
 try:
-    if not SITE_CONFIG["GEMINI_API_KEY"]:
-        logging.critical("GEMINI_API_KEY environment variable not set.")
-    else:
-        genai.configure(api_key=SITE_CONFIG["GEMINI_API_KEY"])
-        GEMINI_API_CONFIGURED = True
+    genai.configure(api_key=SITE_CONFIG["GEMINI_API_KEY"])
+    GEMINI_API_CONFIGURED = True
 except Exception as e:
     logging.critical(f"Could not configure Gemini API. Details: {e}")
 
@@ -74,10 +58,10 @@ if not stripe.api_key:
 
 
 # --- 2. Database Management ---
-DB = { "users": {}, "chats": {}, "site_settings": {"announcement": "Welcome! Student and Teacher signups are now available."}, "ads": {} }
+DB = { "users": {}, "chats": {}, "site_settings": {"announcement": "Welcome! Student and Teacher signups are now available."} }
 
 def save_database():
-    """Saves the in-memory DB to a JSON file atomically."""
+    """Saves the entire in-memory DB to a JSON file atomically."""
     temp_file = f"{DATABASE_FILE}.tmp"
     try:
         with open(temp_file, 'w') as f:
@@ -85,7 +69,6 @@ def save_database():
                 "users": {uid: user_to_dict(u) for uid, u in DB['users'].items()},
                 "chats": DB['chats'],
                 "site_settings": DB['site_settings'],
-                "ads": DB['ads']
             }
             json.dump(serializable_db, f, indent=4)
         os.replace(temp_file, DATABASE_FILE)
@@ -104,7 +87,6 @@ def load_database():
             data = json.load(f)
             DB['chats'] = data.get('chats', {})
             DB['site_settings'] = data.get('site_settings', {"announcement": ""})
-            DB['ads'] = data.get('ads', {})
             DB['users'] = {uid: User.from_dict(u_data) for uid, u_data in data.get('users', {}).items()}
     except (json.JSONDecodeError, FileNotFoundError) as e:
         logging.error(f"Could not load database file. Starting fresh. Error: {e}")
@@ -159,19 +141,12 @@ def load_user(user_id):
 
 def initialize_database_defaults():
     made_changes = False
-    if not User.get_by_username('nameadmin'):
-        admin_pass = os.environ.get('ADMIN_PASSWORD', 'adminadminnoob')
-        admin = User(id='nameadmin', username='nameadmin', password_hash=generate_password_hash(admin_pass), role='admin', plan='ultra', account_type='general')
-        DB['users']['nameadmin'] = admin
+    if not User.get_by_username('admin'):
+        admin_pass = os.environ.get('ADMIN_PASSWORD', 'supersecretadminpassword123')
+        admin = User(id='admin', username='admin', password_hash=generate_password_hash(admin_pass), role='admin', plan='ultra', account_type='general')
+        DB['users']['admin'] = admin
         made_changes = True
         logging.info("Created default admin user.")
-
-    if not User.get_by_username('adminexample'):
-        ad_pass = 'adpass'
-        advertiser = User(id='adminexample', username='adminexample', password_hash=generate_password_hash(ad_pass), role='advertiser', plan='pro', account_type='general')
-        DB['users']['adminexample'] = advertiser
-        made_changes = True
-        logging.info("Created default advertiser user.")
 
     if made_changes:
         save_database()
@@ -182,16 +157,17 @@ with app.app_context():
 
 
 # --- 4. Plan & Rate Limiting Configuration ---
+# Centralized plan configuration
 PLAN_CONFIG = {
-    "free": {"message_limit": 15, "can_upload": False, "model": "gemini-1.5-flash-latest"},
-    "pro": {"message_limit": 50, "can_upload": True, "model": "gemini-1.5-pro-latest"},
-    "ultra": {"message_limit": 10000, "can_upload": True, "model": "gemini-1.5-pro-latest"},
-    "student": {"message_limit": 100, "can_upload": True, "model": "gemini-1.5-flash-latest"}
+    "free": {"name": "Free", "price_string": "Free", "features": ["15 Daily Messages", "Standard Model Access"], "color": "text-gray-300", "message_limit": 15, "can_upload": False, "model": "gemini-1.5-flash-latest"},
+    "pro": {"name": "Pro", "price_string": "$9.99 / month", "features": ["50 Daily Messages", "Image Uploads", "Priority Support"], "color": "text-indigo-400", "message_limit": 50, "can_upload": True, "model": "gemini-1.5-pro-latest"},
+    "ultra": {"name": "Ultra", "price_string": "$100 one-time", "features": ["Unlimited Messages", "Image Uploads", "Access to All Models"], "color": "text-purple-400", "message_limit": 10000, "can_upload": True, "model": "gemini-1.5-pro-latest"},
+    "student": {"name": "Student", "price_string": "$4.99 / month", "features": ["100 Daily Messages", "Image Uploads", "Study Buddy Persona"], "color": "text-green-400", "message_limit": 100, "can_upload": True, "model": "gemini-1.5-flash-latest"}
 }
+
 
 # Simple in-memory rate limiting
 rate_limit_store = {}
-RATE_LIMIT_MAX_ATTEMPTS = 5
 RATE_LIMIT_WINDOW = 60  # seconds
 
 # --- 5. Decorators ---
@@ -213,20 +189,22 @@ def teacher_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-def rate_limited(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        ip = request.remote_addr
-        now = time.time()
-        
-        rate_limit_store[ip] = [t for t in rate_limit_store.get(ip, []) if now - t < RATE_LIMIT_WINDOW]
-        
-        if len(rate_limit_store.get(ip, [])) >= RATE_LIMIT_MAX_ATTEMPTS:
-            return jsonify({"error": "Too many requests. Please try again later."}), 429
+def rate_limited(max_attempts=5):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            ip = request.remote_addr
+            now = time.time()
             
-        rate_limit_store.setdefault(ip, []).append(now)
-        return f(*args, **kwargs)
-    return decorated_function
+            rate_limit_store[ip] = [t for t in rate_limit_store.get(ip, []) if now - t < RATE_LIMIT_WINDOW]
+            
+            if len(rate_limit_store.get(ip, [])) >= max_attempts:
+                return jsonify({"error": "Too many requests. Please try again later."}), 429
+                
+            rate_limit_store.setdefault(ip, []).append(now)
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
 
 # --- 6. HTML, CSS, and JavaScript Frontend ---
 HTML_CONTENT = """
@@ -312,12 +290,6 @@ HTML_CONTENT = """
         </svg>
     </template>
 
-    <template id="template-study-buddy-logo">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2a10 10 0 0 0-10 10c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85v2.74c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2z"/>
-        </svg>
-    </template>
-
     <template id="template-auth-page">
         <div class="flex flex-col items-center justify-center h-full w-full bg-gray-900 p-4">
             <div class="w-full max-w-md glassmorphism rounded-2xl p-8 shadow-2xl animate-scale-up">
@@ -342,8 +314,8 @@ HTML_CONTENT = """
             </div>
              <div class="text-center mt-4 flex justify-center gap-4">
                 <button id="student-signup-link" class="text-xs text-gray-500 hover:text-gray-400">Student Sign Up</button>
-                <button id="special-auth-link" class="text-xs text-gray-500 hover:text-gray-400">Admin & Ad Portal</button>
-                <button id="privacy-policy-link" class="text-xs text-gray-500 hover:text-gray-400">Privacy Policy</button>
+                <button id="teacher-signup-link" class="text-xs text-gray-500 hover:text-gray-400">Teacher Sign Up</button>
+                <button id="special-auth-link" class="text-xs text-gray-500 hover:text-gray-400">Admin Portal</button>
             </div>
         </div>
     </template>
@@ -377,6 +349,35 @@ HTML_CONTENT = """
         </div>
     </template>
     
+    <template id="template-teacher-signup-page">
+        <div class="flex flex-col items-center justify-center h-full w-full bg-gray-900 p-4">
+            <div class="w-full max-w-md glassmorphism rounded-2xl p-8 shadow-2xl animate-scale-up">
+                <div class="flex justify-center mb-6" id="teacher-signup-logo-container"></div>
+                <h2 class="text-3xl font-bold text-center text-white mb-2">Teacher Account Signup</h2>
+                <p class="text-gray-400 text-center mb-8">Create a teacher account to manage student progress.</p>
+                <form id="teacher-signup-form">
+                    <div class="mb-4">
+                        <label for="teacher-username" class="block text-sm font-medium text-gray-300 mb-1">Username</label>
+                        <input type="text" id="teacher-username" name="username" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="teacher-password" class="block text-sm font-medium text-gray-300 mb-1">Password</label>
+                        <input type="password" id="teacher-password" name="password" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" required>
+                    </div>
+                    <div class="mb-6">
+                        <label for="teacher-secret-key" class="block text-sm font-medium text-gray-300 mb-1">Teacher Access Key</label>
+                        <input type="password" id="teacher-secret-key" name="secret_key" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" required>
+                    </div>
+                    <button type="submit" class="w-full bg-gradient-to-r from-blue-500 to-indigo-500 hover:opacity-90 text-white font-bold py-3 px-4 rounded-lg">Create Teacher Account</button>
+                    <p id="teacher-signup-error" class="text-red-400 text-sm text-center h-4 mt-3"></p>
+                </form>
+            </div>
+            <div class="text-center mt-4">
+                <button id="back-to-main-login" class="text-xs text-gray-500 hover:text-gray-400">Back to Main Login</button>
+            </div>
+        </div>
+    </template>
+
     <template id="template-app-wrapper">
         <div id="main-app-layout" class="flex h-full w-full transition-colors duration-500">
             <aside id="sidebar" class="bg-gray-900/70 backdrop-blur-lg w-72 flex-shrink-0 flex flex-col p-2 h-full absolute md:relative z-20 transform transition-transform duration-300 ease-in-out -translate-x-full md:translate-x-0">
@@ -384,27 +385,13 @@ HTML_CONTENT = """
                     <div id="app-logo-container"></div>
                     <h1 class="text-2xl font-bold brand-gradient">Myth AI</h1>
                 </div>
-                <div id="student-mode-toggle-container" class="hidden flex-shrink-0 p-2 mb-2"></div>
+                <div id="study-mode-toggle-container" class="hidden flex-shrink-0 p-2 mb-2"></div>
                 
                 <div class="flex-shrink-0"><button id="new-chat-btn" class="w-full text-left flex items-center gap-3 p-3 rounded-lg hover:bg-gray-700/50 transition-colors duration-200"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14" /><path d="M5 12h14" /></svg> New Chat</button></div>
                 <div id="chat-history-list" class="flex-grow overflow-y-auto my-4 space-y-1 pr-1"></div>
                 
-                <!-- AdSense Placeholder Start -->
-                <div id="adsense-container" class="p-2 mt-auto">
-                    <!-- Your Google AdSense ad unit code goes here -->
-                    <div class="w-full h-24 bg-gray-700/50 rounded-lg flex items-center justify-center text-gray-400 text-sm">
-                        Ad Placeholder
-                    </div>
-                </div>
-                <!-- AdSense Placeholder End -->
-
                 <div class="flex-shrink-0 border-t border-gray-700 pt-2 space-y-1">
                     <div id="user-info" class="p-3 text-sm"></div>
-                    <div id="student-features" class="hidden space-y-1">
-                         <button id="practice-mode-btn" class="w-full text-left flex items-center gap-3 p-3 rounded-lg hover:bg-green-500/20 text-green-400 transition-colors duration-200">Practice Mode</button>
-                         <button id="leaderboard-btn" class="w-full text-left flex items-center gap-3 p-3 rounded-lg hover:bg-green-500/20 text-green-400 transition-colors duration-200">Leaderboard</button>
-                         <button id="top-student-btn" class="w-full text-left flex items-center gap-3 p-3 rounded-lg hover:bg-green-500/20 text-green-400 transition-colors duration-200">Top Student</button>
-                    </div>
                     <button id="upgrade-plan-btn" class="w-full text-left flex items-center gap-3 p-3 rounded-lg hover:bg-indigo-500/20 text-indigo-400 transition-colors duration-200"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6v12m-6-6h12"/></svg> Upgrade Plan</button>
                     <button id="logout-btn" class="w-full text-left flex items-center gap-3 p-3 rounded-lg hover:bg-red-500/20 text-red-400 transition-colors duration-200"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></svg> Logout</button>
                 </div>
@@ -481,11 +468,10 @@ HTML_CONTENT = """
                 </form>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                 <div class="p-6 glassmorphism rounded-lg"><h2 class="text-gray-400 text-lg">Total Users</h2><p id="admin-total-users" class="text-4xl font-bold text-white">0</p></div>
                 <div class="p-6 glassmorphism rounded-lg"><h2 class="text-gray-400 text-lg">Pro Users</h2><p id="admin-pro-users" class="text-4xl font-bold text-white">0</p></div>
                 <div class="p-6 glassmorphism rounded-lg"><h2 class="text-gray-400 text-lg">Ultra Users</h2><p id="admin-ultra-users" class="text-4xl font-bold text-white">0</p></div>
-                <div class="p-6 glassmorphism rounded-lg"><h2 class="text-gray-400 text-lg">Student Users</h2><p id="admin-student-users" class="text-4xl font-bold text-white">0</p></div>
             </div>
 
             <div class="p-6 glassmorphism rounded-lg">
@@ -532,7 +518,7 @@ HTML_CONTENT = """
             <div class="w-full max-w-md glassmorphism rounded-2xl p-8 shadow-2xl animate-scale-up">
                 <div class="flex justify-center mb-6" id="special-auth-logo-container"></div>
                 <h2 class="text-3xl font-bold text-center text-white mb-2">Special Access Signup</h2>
-                <p class="text-gray-400 text-center mb-8">Create an Admin or Advertiser account.</p>
+                <p class="text-gray-400 text-center mb-8">Create an Admin account.</p>
                 <form id="special-auth-form">
                     <div class="mb-4">
                         <label for="special-username" class="block text-sm font-medium text-gray-300 mb-1">Username</label>
@@ -542,16 +528,9 @@ HTML_CONTENT = """
                         <label for="special-password" class="block text-sm font-medium text-gray-300 mb-1">Password</label>
                         <input type="password" id="special-password" name="password" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" required>
                     </div>
-                    <div class="mb-4">
+                    <div class="mb-6">
                         <label for="secret-key" class="block text-sm font-medium text-gray-300 mb-1">Secret Key</label>
                         <input type="password" id="secret-key" name="secret_key" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600" required>
-                    </div>
-                    <div class="mb-6">
-                        <label for="role-select" class="block text-sm font-medium text-gray-300 mb-1">Account Type</label>
-                        <select id="role-select" name="role" class="w-full p-3 bg-gray-700/50 rounded-lg border border-gray-600">
-                            <option value="admin">Admin</option>
-                            <option value="advertiser">Advertiser</option>
-                        </select>
                     </div>
                     <button type="submit" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 text-white font-bold py-3 px-4 rounded-lg">Create Account</button>
                     <p id="special-auth-error" class="text-red-400 text-sm text-center h-4 mt-3"></p>
@@ -563,15 +542,15 @@ HTML_CONTENT = """
         </div>
     </template>
     
-    <template id="template-ad-dashboard">
+    <template id="template-teacher-dashboard">
         <div class="w-full h-full bg-gray-900 p-4 sm:p-6 md:p-8 overflow-y-auto">
             <header class="flex justify-between items-center mb-8">
-                <h1 class="text-3xl font-bold brand-gradient">Advertiser Dashboard</h1>
-                <button id="ad-logout-btn" class="bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded-lg transition-colors">Logout</button>
+                <h1 class="text-3xl font-bold brand-gradient">Teacher Dashboard</h1>
+                <button id="teacher-logout-btn" class="bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded-lg transition-colors">Logout</button>
             </header>
             <div class="max-w-4xl mx-auto glassmorphism rounded-lg p-8">
-                <h2 class="text-2xl font-bold text-white mb-4">Welcome, Advertiser!</h2>
-                <p class="text-gray-300">This is a placeholder for your ad campaign management tools.</p>
+                <h2 class="text-2xl font-bold text-white mb-4">Welcome, Teacher!</h2>
+                <p class="text-gray-300">This dashboard is under development. Soon you will be able to view your students' progress here.</p>
             </div>
         </div>
     </template>
@@ -579,13 +558,13 @@ HTML_CONTENT = """
 
 <script>
 /****************************************************************************
- * JAVASCRIPT FRONTEND LOGIC (MYTH AI V6 - SECURE)
+ * JAVASCRIPT FRONTEND LOGIC (MYTH AI V7 - SECURE & STABLE)
  ****************************************************************************/
 document.addEventListener('DOMContentLoaded', () => {
     const appState = {
         chats: {}, activeChatId: null, isAITyping: false,
         abortController: null, currentUser: null,
-        isPlusMode: false, uploadedFile: null,
+        isStudyMode: false, uploadedFile: null,
     };
 
     const DOMElements = {
@@ -668,10 +647,16 @@ document.addEventListener('DOMContentLoaded', () => {
         DOMElements.appContainer.appendChild(template.content.cloneNode(true));
         renderLogo('auth-logo-container');
         
-        document.getElementById('auth-toggle-btn').onclick = () => {
-            // Simple signup is for general users
-            renderAuthPage(false);
-        };
+        document.getElementById('auth-title').textContent = isLogin ? 'Welcome Back' : 'Create Account';
+        document.getElementById('auth-subtitle').textContent = isLogin ? 'Sign in to continue to Myth AI.' : 'Create a new general account.';
+        document.getElementById('auth-submit-btn').textContent = isLogin ? 'Login' : 'Sign Up';
+        document.getElementById('auth-toggle-btn').textContent = isLogin ? "Don't have an account? Sign Up" : "Already have an account? Login";
+
+
+        document.getElementById('auth-toggle-btn').onclick = () => renderAuthPage(!isLogin);
+        document.getElementById('student-signup-link').onclick = renderStudentSignupPage;
+        document.getElementById('teacher-signup-link').onclick = renderTeacherSignupPage;
+        document.getElementById('special-auth-link').onclick = renderSpecialAuthPage;
 
         document.getElementById('auth-form').onsubmit = async (e) => {
             e.preventDefault();
@@ -681,9 +666,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const formData = new FormData(form);
             const data = Object.fromEntries(formData.entries());
             
-            // Determine if this is a login or general signup
-            const isLoginForm = document.getElementById('auth-submit-btn').textContent === 'Login';
-            const endpoint = isLoginForm ? '/api/login' : '/api/signup';
+            const endpoint = isLogin ? '/api/login' : '/api/signup';
             
             const result = await apiCall(endpoint, {
                 method: 'POST',
@@ -697,10 +680,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 errorEl.textContent = result.error;
             }
         };
-
-        document.getElementById('student-signup-link').onclick = renderStudentSignupPage;
-        document.getElementById('special-auth-link').onclick = renderSpecialAuthPage;
-        document.getElementById('privacy-policy-link').onclick = renderPrivacyPolicyPage;
     }
     
     function renderSpecialAuthPage() {
@@ -758,6 +737,35 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    function renderTeacherSignupPage() {
+        const template = document.getElementById('template-teacher-signup-page');
+        DOMElements.appContainer.innerHTML = '';
+        DOMElements.appContainer.appendChild(template.content.cloneNode(true));
+        renderLogo('teacher-signup-logo-container');
+        document.getElementById('back-to-main-login').onclick = () => renderAuthPage(true);
+        
+        document.getElementById('teacher-signup-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const errorEl = document.getElementById('teacher-signup-error');
+            errorEl.textContent = '';
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+            
+            const result = await apiCall('/api/teacher_signup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+
+            if (result.success) {
+                initializeApp(result.user, result.chats, result.settings);
+            } else {
+                errorEl.textContent = result.error;
+            }
+        };
+    }
+
     async function checkLoginStatus() {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('payment') === 'success') {
@@ -787,8 +795,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (user.role === 'admin') {
             renderAdminDashboard();
-        } else if (user.role === 'advertiser') {
-            renderAdDashboard();
+        } else if (user.account_type === 'teacher') {
+            renderTeacherDashboard();
         } else {
             renderAppUI();
         }
@@ -802,7 +810,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderLogo('app-logo-container');
         
         const sortedChatIds = Object.keys(appState.chats).sort((a, b) =>
-            appState.chats[b].created_at.localeCompare(appState.chats[a].created_at)
+            (appState.chats[b].created_at || '').localeCompare(appState.chats[a].created_at || '')
         );
         appState.activeChatId = sortedChatIds.length > 0 ? sortedChatIds[0] : null;
 
@@ -810,7 +818,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderActiveChat();
         updateUserInfo();
         setupAppEventListeners();
-        renderPlusModeToggle();
+        renderStudyModeToggle();
     }
 
     function renderActiveChat() {
@@ -823,7 +831,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updatePreviewContainer();
 
         const chat = appState.chats[appState.activeChatId];
-        if (chat && chat.messages.length > 0) {
+        if (chat && chat.messages && chat.messages.length > 0) {
             chatTitle.textContent = chat.title;
             chat.messages.forEach(msg => addMessageToDOM(msg));
             renderCodeCopyButtons();
@@ -842,9 +850,9 @@ document.addEventListener('DOMContentLoaded', () => {
         chatWindow.appendChild(template.content.cloneNode(true));
         renderLogo('welcome-logo-container');
         
-        if (appState.isPlusMode) {
-            document.getElementById('welcome-title').textContent = "Welcome to MythAI Plus!";
-            document.getElementById('welcome-subtitle').textContent = "You have access to our enhanced AI. How can I assist you?";
+        if (appState.isStudyMode) {
+            document.getElementById('welcome-title').textContent = "Welcome to Study Buddy!";
+            document.getElementById('welcome-subtitle').textContent = "Let's learn something new. Ask me a question about your homework.";
         } else {
             document.getElementById('welcome-title').textContent = "Welcome to Myth AI";
             document.getElementById('welcome-subtitle').textContent = "How can I help you today?";
@@ -856,7 +864,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!listEl) return;
         listEl.innerHTML = '';
         Object.values(appState.chats)
-            .sort((a, b) => b.created_at.localeCompare(a.created_at))
+            .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
             .forEach(chat => {
                 const item = document.createElement('button');
                 item.className = `w-full text-left p-3 rounded-lg hover:bg-gray-700/50 transition-colors duration-200 truncate text-sm ${chat.id === appState.activeChatId ? 'bg-blue-600/30 font-semibold' : ''}`;
@@ -880,8 +888,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!userInfoDiv || !appState.currentUser) return;
 
         const { username, plan, account_type } = appState.currentUser;
-        const planName = plan.charAt(0).toUpperCase() + plan.slice(1);
-        const planColor = (plan === 'pro' || plan === 'ultra' || plan === 'plus') ? 'text-indigo-400' : 'text-gray-400';
+        const planDetails = PLAN_CONFIG[plan] || PLAN_CONFIG['free'];
+        const planName = planDetails.name;
+        const planColor = planDetails.color;
         const avatarColor = `hsl(${username.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % 360}, 50%, 60%)`;
         
         userInfoDiv.innerHTML = `
@@ -891,12 +900,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div>
                     <div class="font-semibold">${username}</div>
-                    <div class="text-xs ${planColor}">${planName} Plan (${account_type.replace('_', ' ')})</div>
+                    <div class="text-xs ${planColor}">${planName} Plan (${account_type.charAt(0).toUpperCase() + account_type.slice(1)})</div>
                 </div>
             </div>`;
         
         const limitDisplay = document.getElementById('message-limit-display');
-        if(limitDisplay) limitDisplay.textContent = `Daily Messages: ${appState.currentUser.daily_messages} / ${appState.currentUser.message_limit}`;
+        if(limitDisplay) limitDisplay.textContent = `Daily Messages: ${appState.currentUser.daily_messages} / ${planDetails.message_limit}`;
     }
 
     function updateUIState() {
@@ -915,29 +924,35 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (uploadBtn) {
-            uploadBtn.style.display = appState.currentUser.can_upload ? 'block' : 'none';
+            const planDetails = PLAN_CONFIG[appState.currentUser.plan] || PLAN_CONFIG['free'];
+            uploadBtn.style.display = planDetails.can_upload ? 'block' : 'none';
         }
     }
 
-    function renderPlusModeToggle() {
-        const container = document.getElementById('plus-mode-toggle-container');
-        if (!container || appState.currentUser.account_type !== 'plus_user') return;
+    function renderStudyModeToggle() {
+        const container = document.getElementById('study-mode-toggle-container');
+        if (!container || appState.currentUser.account_type !== 'student') return;
 
         container.classList.remove('hidden');
         container.innerHTML = `
-            <label for="plus-mode-toggle" class="flex items-center cursor-pointer">
+            <label for="study-mode-toggle" class="flex items-center cursor-pointer p-2 rounded-lg bg-green-900/50 border border-green-700">
                 <div class="relative">
-                    <input type="checkbox" id="plus-mode-toggle" class="sr-only">
+                    <input type="checkbox" id="study-mode-toggle" class="sr-only">
                     <div class="block bg-gray-600 w-14 h-8 rounded-full"></div>
                     <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition"></div>
                 </div>
-                <div class="ml-3 font-medium">MythAI Plus Mode</div>
+                <div class="ml-3 font-medium text-green-300">Study Buddy Mode</div>
             </label>
         `;
-        const toggle = document.getElementById('plus-mode-toggle');
+        const toggle = document.getElementById('study-mode-toggle');
+        const dot = toggle.nextElementSibling.nextElementSibling;
+        const block = toggle.nextElementSibling;
+        
         toggle.addEventListener('change', () => {
-            appState.isPlusMode = toggle.checked;
-            document.getElementById('main-app-layout').classList.toggle('plus-mode', appState.isPlusMode);
+            appState.isStudyMode = toggle.checked;
+            document.body.classList.toggle('study-buddy-mode', appState.isStudyMode);
+            dot.classList.toggle('translate-x-full', appState.isStudyMode);
+            block.classList.toggle('bg-green-500', appState.isStudyMode);
             renderActiveChat();
         });
     }
@@ -1004,7 +1019,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const formData = new FormData();
             formData.append('chat_id', appState.activeChatId);
             formData.append('prompt', prompt);
-            formData.append('is_plus_mode', appState.isPlusMode);
+            formData.append('is_study_mode', appState.isStudyMode);
             if (fileToSend) {
                 formData.append('file', fileToSend);
             }
@@ -1074,9 +1089,9 @@ document.addEventListener('DOMContentLoaded', () => {
         wrapper.innerHTML = `
             ${senderIsAI ? aiAvatarHTML : userAvatarHTML}
             <div class="flex-1 min-w-0">
-                <div class="font-bold">${senderIsAI ? (appState.isPlusMode ? 'MythAI Plus' : 'Myth AI') : 'You'}</div>
+                <div class="font-bold">${senderIsAI ? (appState.isStudyMode ? 'Study Buddy' : 'Myth AI') : 'You'}</div>
                 <div class="prose prose-invert max-w-none message-content">
-                    ${isStreaming ? '<span class="animate-pulse">...</span>' : DOMPurify.sanitize(marked.parse(msg.content))}
+                    ${isStreaming ? '<div class="typing-indicator"><span></span><span></span><span></span></div>' : DOMPurify.sanitize(marked.parse(msg.content))}
                 </div>
             </div>`;
         chatWindow.appendChild(wrapper);
@@ -1125,7 +1140,7 @@ document.addEventListener('DOMContentLoaded', () => {
             switch (target.id) {
                 case 'new-chat-btn': createNewChat(true); break;
                 case 'logout-btn': handleLogout(); break;
-                case 'ad-logout-btn': handleLogout(); break;
+                case 'teacher-logout-btn': handleLogout(); break;
                 case 'send-btn': handleSendMessage(); break;
                 case 'stop-generating-btn': appState.abortController?.abort(); break;
                 case 'rename-chat-btn': handleRenameChat(); break;
@@ -1167,7 +1182,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function handleLogout(doApiCall = true) {
-        if(doApiCall) await fetch('/api/logout');
+        if(doApiCall) await apiCall('/api/logout');
         appState.currentUser = null;
         appState.chats = {};
         appState.activeChatId = null;
@@ -1175,8 +1190,45 @@ document.addEventListener('DOMContentLoaded', () => {
         renderAuthPage();
     }
     
-    function handleRenameChat() { /* ... same as before ... */ }
-    function handleDeleteChat() { /* ... same as before ... */ }
+    function handleRenameChat() {
+        if (!appState.activeChatId) return;
+        const oldTitle = appState.chats[appState.activeChatId].title;
+        const newTitle = prompt("Enter a new name for this chat:", oldTitle);
+        if (newTitle && newTitle.trim() !== oldTitle) {
+            apiCall('/api/chat/rename', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: appState.activeChatId, title: newTitle.trim() }),
+            }).then(result => {
+                if (result.success) {
+                    appState.chats[appState.activeChatId].title = newTitle.trim();
+                    renderChatHistoryList();
+                    document.getElementById('chat-title').textContent = newTitle.trim();
+                    showToast("Chat renamed!", "success");
+                }
+            });
+        }
+    }
+
+    function handleDeleteChat() {
+        if (!appState.activeChatId) return;
+        if (confirm("Are you sure you want to delete this chat? This action cannot be undone.")) {
+            apiCall('/api/chat/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: appState.activeChatId }),
+            }).then(result => {
+                if (result.success) {
+                    delete appState.chats[appState.activeChatId];
+                    const sortedChatIds = Object.keys(appState.chats).sort((a, b) => (appState.chats[b].created_at || '').localeCompare(appState.chats[a].created_at || ''));
+                    appState.activeChatId = sortedChatIds.length > 0 ? sortedChatIds[0] : null;
+                    renderChatHistoryList();
+                    renderActiveChat();
+                    showToast("Chat deleted.", "success");
+                }
+            });
+        }
+    }
     
     async function handleShareChat() {
         if (!appState.activeChatId) return;
@@ -1213,16 +1265,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const { plans, user_plan, user_account_type } = plansResult;
+        const { plans, user_plan } = plansResult;
         plansContainer.innerHTML = '';
 
-        const planOrder = ['free', 'plus', 'pro', 'ultra'];
+        const planOrder = ['free', 'pro', 'ultra', 'student'];
         planOrder.forEach(planId => {
             if (!plans[planId]) return;
             
-            if (planId === 'plus' && user_account_type !== 'plus_user') return;
-            if (['pro', 'ultra'].includes(planId) && user_account_type === 'plus_user') return;
-
             const plan = plans[planId];
             const card = document.createElement('div');
             const isCurrentUserPlan = planId === user_plan;
@@ -1232,7 +1281,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h2 class="text-2xl font-bold text-center ${plan.color}">${plan.name}</h2>
                 <p class="text-4xl font-bold text-center my-4 text-white">${plan.price_string}</p>
                 <ul class="space-y-2 text-gray-300 mb-6">${plan.features.map(f => `<li>✓ ${f}</li>`).join('')}</ul>
-                <button ${isCurrentUserPlan ? 'disabled' : ''} data-planid="${planId}" class="purchase-btn w-full mt-6 font-bold py-3 px-4 rounded-lg transition-opacity ${isCurrentUserPlan ? 'bg-gray-600 cursor-not-allowed' : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-90'}">
+                <button ${isCurrentUserPlan || planId === 'free' ? 'disabled' : ''} data-planid="${planId}" class="purchase-btn w-full mt-6 font-bold py-3 px-4 rounded-lg transition-opacity ${isCurrentUserPlan ? 'bg-gray-600 cursor-not-allowed' : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:opacity-90'}">
                     ${isCurrentUserPlan ? 'Current Plan' : 'Upgrade'}
                 </button>
             `;
@@ -1268,7 +1317,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- ADMIN LOGIC ---
+    // --- ADMIN & TEACHER LOGIC ---
     function renderAdminDashboard() {
         const template = document.getElementById('template-admin-dashboard');
         DOMElements.appContainer.innerHTML = '';
@@ -1280,6 +1329,13 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchAdminData();
     }
 
+    function renderTeacherDashboard() {
+        const template = document.getElementById('template-teacher-dashboard');
+        DOMElements.appContainer.innerHTML = '';
+        DOMElements.appContainer.appendChild(template.content.cloneNode(true));
+        document.getElementById('teacher-logout-btn').onclick = handleLogout;
+    }
+
     async function fetchAdminData() {
         const data = await apiCall('/api/admin_data');
         if (!data.success) return;
@@ -1287,7 +1343,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('admin-total-users').textContent = data.stats.total_users;
         document.getElementById('admin-pro-users').textContent = data.stats.pro_users;
         document.getElementById('admin-ultra-users').textContent = data.stats.ultra_users;
-        document.getElementById('admin-plus-users').textContent = data.stats.plus_users;
         document.getElementById('announcement-input').value = data.announcement;
 
         const userList = document.getElementById('admin-user-list');
@@ -1299,7 +1354,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td class="p-2">${user.username}</td>
                 <td class="p-2">${user.role}</td>
                 <td class="p-2">${user.plan}</td>
-                <td class="p-2">${user.account_type.replace('_', ' ')}</td>
+                <td class="p-2">${user.account_type}</td>
                 <td class="p-2 flex gap-2">
                     <button data-userid="${user.id}" class="delete-user-btn text-xs px-2 py-1 rounded bg-red-600">Delete</button>
                 </td>`;
@@ -1327,7 +1382,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function handleAdminDeleteUser(e) { /* ... same as before, but calls fetchAdminData() ... */ }
+    function handleAdminDeleteUser(e) {
+        const userId = e.target.dataset.userid;
+        if (confirm(`Are you sure you want to delete user ${userId}? This is irreversible.`)) {
+            apiCall('/api/admin/delete_user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId }),
+            }).then(result => {
+                if (result.success) {
+                    showToast(result.message, 'success');
+                    fetchAdminData(); // Refresh the list
+                }
+            });
+        }
+    }
     
     async function handleImpersonate() {
         const username = prompt("Enter the username of the user to impersonate:");
@@ -1359,6 +1428,7 @@ def check_and_reset_daily_limit(user):
     if user.last_message_date != today_str:
         user.last_message_date = today_str
         user.daily_messages = 0
+        save_database() # Save change immediately
 
 def get_user_data_for_frontend(user):
     """Prepares user data for sending to the frontend."""
@@ -1379,13 +1449,6 @@ def get_all_user_chats(user_id):
 # --- 8. Core API Routes (Auth, Status) ---
 @app.route('/')
 def index():
-    if 'impersonator_id' in session:
-        impersonator = User.get(session['impersonator_id'])
-        if impersonator:
-            logout_user()
-            login_user(impersonator)
-            session.pop('impersonator_id', None)
-            return redirect(url_for('index'))
     return Response(HTML_CONTENT, mimetype='text/html')
 
 @app.route('/api/config')
@@ -1393,7 +1456,7 @@ def get_config():
     return jsonify({"stripe_public_key": SITE_CONFIG["STRIPE_PUBLIC_KEY"]})
 
 @app.route('/api/signup', methods=['POST'])
-@rate_limited
+@rate_limited()
 def signup():
     data = request.get_json()
     if not data: return jsonify({"error": "Invalid request format."}), 400
@@ -1421,7 +1484,7 @@ def signup():
         return jsonify({"error": "An internal server error occurred during signup."}), 500
 
 @app.route('/api/student_signup', methods=['POST'])
-@rate_limited
+@rate_limited()
 def student_signup():
     data = request.get_json()
     if not data: return jsonify({"error": "Invalid request format."}), 400
@@ -1438,7 +1501,6 @@ def student_signup():
         return jsonify({"error": "Username already exists."}), 409
     
     try:
-        # New student users are created with the 'student' account type and plan
         new_user = User(id=username, username=username, password_hash=generate_password_hash(password), account_type='student', plan='student')
         DB['users'][new_user.id] = new_user
         save_database()
@@ -1451,8 +1513,38 @@ def student_signup():
         logging.error(f"Error during student signup for {username}: {e}")
         return jsonify({"error": "An internal server error occurred during signup."}), 500
 
+@app.route('/api/teacher_signup', methods=['POST'])
+@rate_limited()
+def teacher_signup():
+    data = request.get_json()
+    if not data: return jsonify({"error": "Invalid request format."}), 400
+    
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+    secret_key = data.get('secret_key')
+
+    if secret_key != SITE_CONFIG["SECRET_TEACHER_KEY"]:
+        return jsonify({"error": "Invalid teacher access key."}), 403
+    if not all([username, password]) or len(username) < 3 or len(password) < 6:
+        return jsonify({"error": "Username (min 3 chars) and password (min 6 chars) are required."}), 400
+    if User.get_by_username(username):
+        return jsonify({"error": "Username already exists."}), 409
+    
+    try:
+        new_user = User(id=username, username=username, password_hash=generate_password_hash(password), account_type='teacher', plan='pro')
+        DB['users'][new_user.id] = new_user
+        save_database()
+        login_user(new_user, remember=True)
+        return jsonify({
+            "success": True, "user": get_user_data_for_frontend(new_user),
+            "chats": {}, "settings": DB['site_settings']
+        })
+    except Exception as e:
+        logging.error(f"Error during teacher signup for {username}: {e}")
+        return jsonify({"error": "An internal server error occurred during signup."}), 500
+
 @app.route('/api/login', methods=['POST'])
-@rate_limited
+@rate_limited()
 def login():
     data = request.get_json()
     if not data: return jsonify({"error": "Invalid request format."}), 400
@@ -1470,6 +1562,15 @@ def login():
 
 @app.route('/api/logout')
 def logout():
+    # If admin was impersonating, log them back in as themselves
+    if 'impersonator_id' in session:
+        impersonator = User.get(session['impersonator_id'])
+        if impersonator:
+            logout_user()
+            login_user(impersonator)
+            session.pop('impersonator_id', None)
+            return redirect(url_for('index'))
+
     logout_user()
     return jsonify({"success": True})
 
@@ -1484,23 +1585,22 @@ def status():
     return jsonify({"logged_in": False})
 
 @app.route('/api/special_signup', methods=['POST'])
-@rate_limited
+@rate_limited()
 def special_signup():
     data = request.get_json()
     if not data: return jsonify({"error": "Invalid request format."}), 400
     
-    username, password, secret_key, role = data.get('username'), data.get('password'), data.get('secret_key'), data.get('role')
+    username, password, secret_key = data.get('username'), data.get('password'), data.get('secret_key')
 
     if secret_key != SITE_CONFIG["SECRET_REGISTRATION_KEY"]:
         return jsonify({"error": "Invalid secret key."}), 403
-    if role not in ['admin', 'advertiser']:
-        return jsonify({"error": "Invalid role specified."}), 400
+    
     if not all([username, password]):
         return jsonify({"error": "Username and password are required."}), 400
     if User.get_by_username(username):
         return jsonify({"error": "Username already exists."}), 409
 
-    new_user = User(id=username, username=username, password_hash=generate_password_hash(password), role=role, plan='pro')
+    new_user = User(id=username, username=username, password_hash=generate_password_hash(password), role='admin', plan='ultra')
     DB['users'][new_user.id] = new_user
     save_database()
     login_user(new_user, remember=True)
@@ -1510,6 +1610,7 @@ def special_signup():
 # --- 9. Chat API Routes ---
 @app.route('/api/chat', methods=['POST'])
 @login_required
+@rate_limited(max_attempts=20)
 def chat_api():
     if not GEMINI_API_CONFIGURED:
         return jsonify({"error": "AI services are currently unavailable."}), 503
@@ -1518,7 +1619,7 @@ def chat_api():
         data = request.form
         chat_id = data.get('chat_id')
         prompt = data.get('prompt', '').strip()
-        is_student_mode = data.get('is_student_mode') == 'true'
+        is_study_mode = data.get('is_study_mode') == 'true'
         
         if not chat_id:
             return jsonify({"error": "Missing chat identifier."}), 400
@@ -1534,9 +1635,9 @@ def chat_api():
         
         # --- Context and Persona Injection ---
         current_time = datetime.now().strftime('%A, %B %d, %Y at %I:%M %p')
-        base_system_instruction = f"The current date and time is {current_time}. The user is located in Yorkton, Saskatchewan, Canada. Your developer is devector me."
+        base_system_instruction = f"The current date and time is {current_time}. The user is located in Yorkton, Saskatchewan, Canada. Your developer is devector."
         
-        if is_student_mode and current_user.account_type == 'student':
+        if is_study_mode and current_user.account_type == 'student':
             persona_instruction = "You are Study Buddy, a friendly and encouraging tutor. Your goal is to guide the user to the answer without giving it away directly. Ask leading questions, explain concepts simply, and help them break down the problem. Never just provide the final answer."
         else:
             persona_instruction = "You are Myth AI, a powerful, general-purpose assistant for creative tasks, coding, and complex questions."
@@ -1544,7 +1645,8 @@ def chat_api():
         final_system_instruction = f"{base_system_instruction}\n\n{persona_instruction}"
 
         # --- History and File Handling ---
-        history = [{"role": "user" if msg['sender'] == 'user' else 'model', "parts": [{"text": msg['content']}]} for msg in chat['messages']]
+        # Optimized history: send only last 10 messages to save tokens
+        history = [{"role": "user" if msg['sender'] == 'user' else 'model', "parts": [{"text": msg['content']}]} for msg in chat['messages'][-10:]]
         
         model_input_parts = []
         if prompt:
@@ -1686,15 +1788,17 @@ def view_shared_chat(chat_id):
 @app.route('/api/plans')
 @login_required
 def get_plans():
-    plans = {
-        "free": {"name": "Free", "price_string": "Free", "features": ["15 Daily Messages", "Standard Model Access"], "color": "text-gray-300"},
-        "pro": {"name": "Pro", "price_string": "$9.99 / month", "features": ["50 Daily Messages", "Image Uploads", "Priority Support"], "color": "text-indigo-400"},
-        "ultra": {"name": "Ultra", "price_string": "$100 one-time", "features": ["Unlimited Messages", "Image Uploads", "Access to All Models"], "color": "text-purple-400"},
-        "student": {"name": "Student", "price_string": "$4.99 / month", "features": ["100 Daily Messages", "Image Uploads", "Study Buddy Persona"], "color": "text-green-400"}
+    # Return a subset of PLAN_CONFIG for the frontend
+    plans_for_frontend = {
+        plan_id: {
+            "name": details["name"],
+            "price_string": details["price_string"],
+            "features": details["features"],
+            "color": details["color"]
+        } for plan_id, details in PLAN_CONFIG.items()
     }
     return jsonify({
-        "success": True, "plans": plans, "user_plan": current_user.plan,
-        "user_account_type": current_user.account_type
+        "success": True, "plans": plans_for_frontend, "user_plan": current_user.plan,
     })
 
 @app.route('/api/create-checkout-session', methods=['POST'])
@@ -1716,8 +1820,8 @@ def create_checkout_session():
         checkout_session = stripe.checkout.Session.create(
             line_items=[{'price': price_map[plan_id]['id'], 'quantity': 1}],
             mode=price_map[plan_id]['mode'],
-            success_url=SITE_CONFIG["YOUR_DOMAIN"] + f'/payment-success?plan={plan_id}',
-            cancel_url=SITE_CONFIG["YOUR_DOMAIN"] + '/payment-cancel',
+            success_url=SITE_CONFIG["YOUR_DOMAIN"] + f'/?payment=success',
+            cancel_url=SITE_CONFIG["YOUR_DOMAIN"] + '/?payment=cancel',
             client_reference_id=current_user.id
         )
         return jsonify({'id': checkout_session.id})
@@ -1725,19 +1829,55 @@ def create_checkout_session():
         logging.error(f"Stripe session creation failed for user {current_user.id}: {e}")
         return jsonify(error={'message': "Could not create payment session."}), 500
 
-@app.route('/payment-success')
-@login_required
-def payment_success():
-    plan = request.args.get('plan')
-    if plan in ['pro', 'ultra', 'student']:
-        current_user.plan = plan
-        save_database()
-    return redirect('/?payment=success')
+@app.route('/stripe-webhook', methods=['POST'])
+def stripe_webhook():
+    payload = request.get_data(as_text=True)
+    sig_header = request.headers.get('Stripe-Signature')
+    endpoint_secret = os.environ.get('STRIPE_WEBHOOK_SECRET')
 
-@app.route('/payment-cancel')
-@login_required
-def payment_cancel():
-    return redirect('/?payment=cancel')
+    if not all([payload, sig_header, endpoint_secret]):
+        return 'Missing data for webhook', 400
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, endpoint_secret
+        )
+    except ValueError as e:
+        # Invalid payload
+        return 'Invalid payload', 400
+    except stripe.error.SignatureVerificationError as e:
+        # Invalid signature
+        return 'Invalid signature', 400
+
+    # Handle the checkout.session.completed event
+    if event['type'] == 'checkout.session.completed':
+        session = event['data']['object']
+        client_reference_id = session.get('client_reference_id')
+        user = User.get(client_reference_id)
+
+        if user:
+            # Logic to determine which plan was purchased
+            # This is a simplified example. A real app would inspect the line items.
+            # For now, we'll assume the plan is stored in metadata or determined from the price ID.
+            # This part needs to be robust in a real application.
+            # A simple approach:
+            line_item = session.list_line_items(session.id, limit=1).data[0]
+            price_id = line_item.price.id
+            
+            new_plan = None
+            if price_id == SITE_CONFIG["STRIPE_PRO_PRICE_ID"]:
+                new_plan = 'pro'
+            elif price_id == SITE_CONFIG["STRIPE_ULTRA_PRICE_ID"]:
+                new_plan = 'ultra'
+            elif price_id == SITE_CONFIG["STRIPE_STUDENT_PRICE_ID"]:
+                new_plan = 'student'
+
+            if new_plan:
+                user.plan = new_plan
+                save_database()
+                logging.info(f"User {user.id} successfully upgraded to {new_plan} plan via webhook.")
+
+    return 'Success', 200
 
 
 # --- 11. Admin Routes ---
@@ -1745,13 +1885,12 @@ def payment_cancel():
 @admin_required
 def admin_data():
     all_users_data = []
-    stats = {"total_users": 0, "pro_users": 0, "ultra_users": 0, "student_users": 0}
+    stats = {"total_users": 0, "pro_users": 0, "ultra_users": 0}
     for user in DB["users"].values():
         if user.role != 'admin':
             stats['total_users'] += 1
             if user.plan == 'pro': stats['pro_users'] += 1
             elif user.plan == 'ultra': stats['ultra_users'] += 1
-            elif user.plan == 'student': stats['student_users'] += 1
             
             all_users_data.append({
                 "id": user.id, "username": user.username, "plan": user.plan,
@@ -1766,16 +1905,26 @@ def admin_data():
 @app.route('/api/admin/delete_user', methods=['POST'])
 @admin_required
 def admin_delete_user():
-    user_id = request.json.get('user_id')
-    if user_id == current_user.id:
+    user_id_to_delete = request.json.get('user_id')
+    
+    if user_id_to_delete == current_user.id:
         return jsonify({"error": "Cannot delete your own account."}), 400
-    if user_id in DB['users']:
-        del DB['users'][user_id]
-        chats_to_delete = [cid for cid, c in DB['chats'].items() if c.get('user_id') == user_id]
-        for cid in chats_to_delete: del DB['chats'][cid]
-        save_database()
-        return jsonify({"success": True, "message": f"User {user_id} and their chats deleted."})
-    return jsonify({"error": "User not found."}), 404
+
+    user_to_delete = User.get(user_id_to_delete)
+    if not user_to_delete:
+        return jsonify({"error": "User not found."}), 404
+
+    # Prevent deleting the last admin
+    admin_users = [u for u in DB['users'].values() if u.role == 'admin']
+    if user_to_delete.role == 'admin' and len(admin_users) <= 1:
+        return jsonify({"error": "Cannot delete the last admin account."}), 403
+
+    del DB['users'][user_id_to_delete]
+    chats_to_delete = [cid for cid, c in DB['chats'].items() if c.get('user_id') == user_id_to_delete]
+    for cid in chats_to_delete: del DB['chats'][cid]
+    save_database()
+    return jsonify({"success": True, "message": f"User {user_id_to_delete} and their chats deleted."})
+
 
 @app.route('/api/admin/announcement', methods=['POST'])
 @admin_required
@@ -1804,3 +1953,4 @@ def impersonate_user():
 # --- Main Execution ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
+
