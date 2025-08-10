@@ -166,10 +166,10 @@ with app.app_context():
 
 # --- 4. Plan & Rate Limiting Configuration ---
 PLAN_CONFIG = {
-    "free": {"name": "Free", "price_string": "Free", "features": ["15 Daily Messages", "Standard Model Access", "No Image Uploads"], "color": "text-gray-300", "message_limit": 15, "can_upload": False, "model": "gemini-1.5-flash-latest"},
-    "pro": {"name": "Pro", "price_string": "$9.99 / month", "features": ["50 Daily Messages", "Image Uploads", "Priority Support"], "color": "text-indigo-400", "message_limit": 50, "can_upload": True, "model": "gemini-1.5-pro-latest"},
-    "ultra": {"name": "Ultra", "price_string": "$100 one-time", "features": ["Unlimited Messages", "Image Uploads", "Access to All Models"], "color": "text-purple-400", "message_limit": 10000, "can_upload": True, "model": "gemini-1.5-pro-latest"},
-    "student": {"name": "Student", "price_string": "$4.99 / month", "features": ["100 Daily Messages", "Image Uploads", "Study Buddy Persona", "Streak & Leaderboard"], "color": "text-green-400", "message_limit": 100, "can_upload": True, "model": "gemini-1.5-flash-latest"}
+    "free": {"name": "Free", "price_string": "Free", "features": ["15 Daily Messages", "Standard Model Access", "No Image Uploads"], "color": "text-gray-300", "message_limit": 15, "can_upload": False, "model": "gemini-1.5-flash-latest", "can_tts": False},
+    "pro": {"name": "Pro", "price_string": "$9.99 / month", "features": ["50 Daily Messages", "Image Uploads", "Priority Support", "Voice Chat"], "color": "text-indigo-400", "message_limit": 50, "can_upload": True, "model": "gemini-1.5-pro-latest", "can_tts": True},
+    "ultra": {"name": "Ultra", "price_string": "$100 one-time", "features": ["Unlimited Messages", "Image Uploads", "Access to All Models", "Voice Chat"], "color": "text-purple-400", "message_limit": 10000, "can_upload": True, "model": "gemini-1.5-pro-latest", "can_tts": True},
+    "student": {"name": "Student", "price_string": "$4.99 / month", "features": ["100 Daily Messages", "Image Uploads", "Study Buddy Persona", "Streak & Leaderboard"], "color": "text-green-400", "message_limit": 100, "can_upload": True, "model": "gemini-1.5-flash-latest", "can_tts": False}
 }
 
 # Simple in-memory rate limiting
@@ -414,11 +414,13 @@ HTML_CONTENT = """
                         <button id="share-chat-btn" title="Share Chat" class="p-2 rounded-lg hover:bg-gray-700/50 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>
                         <button id="rename-chat-btn" title="Rename Chat" class="p-2 rounded-lg hover:bg-gray-700/50 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg></button>
                         <button id="delete-chat-btn" title="Delete Chat" class="p-2 rounded-lg hover:bg-red-500/20 text-red-400 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg></button>
+                        <button id="download-chat-btn" title="Download Chat" class="p-2 rounded-lg hover:bg-gray-700/50 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>
                     </div>
                 </header>
                 <div id="chat-window" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 min-h-0"></div>
                 <div class="flex-shrink-0 p-2 md:p-4 md:px-6 border-t border-gray-700/50">
                     <div class="max-w-4xl mx-auto">
+                         <div id="student-leaderboard-container" class="glassmorphism p-4 rounded-lg hidden"></div>
                         <div id="stop-generating-container" class="text-center mb-2" style="display: none;">
                             <button id="stop-generating-btn" class="bg-red-600/50 hover:bg-red-600/80 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center gap-2 mx-auto"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><rect width="10" height="10" x="3" y="3" rx="1"/></svg> Stop Generating</button>
                         </div>
@@ -437,9 +439,6 @@ HTML_CONTENT = """
                     </div>
                 </div>
             </main>
-        </div>
-        <div id="adsense-container" class="absolute top-4 right-4 z-10 w-48 h-24 bg-gray-700 rounded-lg flex items-center justify-center text-gray-400 text-xs">
-            <p>AdSense Ad Here</p>
         </div>
     </template>
 
@@ -607,7 +606,7 @@ HTML_CONTENT = """
 
     <script>
 /****************************************************************************
- * JAVASCRIPT FRONTEND LOGIC (MYTH AI V8 - TEACHER FEATURES)
+ * JAVASCRIPT FRONTEND LOGIC (MYTH AI V9 - FINAL FIXES & FEATURES)
  ****************************************************************************/
 document.addEventListener('DOMContentLoaded', () => {
     const appState = {
@@ -615,6 +614,7 @@ document.addEventListener('DOMContentLoaded', () => {
         abortController: null, currentUser: null,
         isStudyMode: false, uploadedFile: null,
         teacherData: { classroom: null, students: [] },
+        audio: null,
     };
 
     const DOMElements = {
@@ -642,7 +642,8 @@ document.addEventListener('DOMContentLoaded', () => {
             container.appendChild(logoTemplate.content.cloneNode(true));
         }
     }
-
+    
+    // Polyfill for fetch.
     async function apiCall(endpoint, options = {}) {
         try {
             const response = await fetch(endpoint, {
@@ -692,7 +693,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function closeModal() {
         document.getElementById('modal-instance')?.remove();
     }
-
+    
     // --- AUTHENTICATION & INITIALIZATION ---
     function renderAuthPage(isLogin = true) {
         const template = document.getElementById('template-auth-page');
@@ -872,16 +873,13 @@ document.addEventListener('DOMContentLoaded', () => {
         setupAppEventListeners();
         renderStudyModeToggle();
         
-        // Show streaks for students
+        // Show streaks and leaderboard for students
         if (appState.currentUser.account_type === 'student') {
-            const streakElement = document.createElement('div');
-            streakElement.className = 'flex items-center gap-2 p-3 text-sm text-yellow-300';
-            streakElement.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18v-6h.01"/><path d="M10 16a2 2 0 1 1 4 0 2 2 0 0 1-4 0z"/></svg> Streak: ${appState.currentUser.streak} days`;
-            document.getElementById('user-info').appendChild(streakElement);
+            fetchStudentLeaderboard();
         }
     }
 
-    function renderActiveChat() {
+    async function renderActiveChat() {
         const chatWindow = document.getElementById('chat-window');
         const chatTitle = document.getElementById('chat-title');
         if (!chatWindow || !chatTitle) return;
@@ -951,7 +949,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 renameBtn.className = 'p-1 rounded-full hover:bg-blue-500/20 text-blue-400';
                 renameBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>';
                 renameBtn.onclick = (e) => {
-                    e.stopPropagation(); // Prevent opening chat when clicking the button
+                    e.stopPropagation();
                     const newTitle = prompt("Enter a new name for this chat:", chat.title);
                     if (newTitle && newTitle.trim() !== chat.title) {
                         apiCall('/api/chat/rename', {
@@ -977,7 +975,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 deleteBtn.className = 'p-1 rounded-full hover:bg-red-500/20 text-red-400';
                 deleteBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg>';
                 deleteBtn.onclick = (e) => {
-                    e.stopPropagation(); // Prevent opening chat when clicking the button
+                    e.stopPropagation();
                     if (confirm("Are you sure you want to delete this chat? This action cannot be undone.")) {
                         apiCall('/api/chat/delete', {
                             method: 'POST',
@@ -1031,7 +1029,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateUIState() {
         const sendBtn = document.getElementById('send-btn');
         const stopContainer = document.getElementById('stop-generating-container');
-        const chatActionButtons = ['share-chat-btn', 'rename-chat-btn', 'delete-chat-btn'];
+        const chatActionButtons = ['share-chat-btn', 'rename-chat-btn', 'delete-chat-btn', 'download-chat-btn'];
         const uploadBtn = document.getElementById('upload-btn');
 
         if (sendBtn) sendBtn.disabled = appState.isAITyping;
@@ -1108,6 +1106,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const prompt = userInput.value.trim();
         if ((!prompt && !appState.uploadedFile) || appState.isAITyping) return;
 
+        appState.isAITyping = true;
+        appState.abortController = new AbortController();
+        updateUIState();
+        
         try {
             if (!appState.activeChatId) {
                 const chatCreated = await createNewChat(false);
@@ -1134,10 +1136,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const fileToSend = appState.uploadedFile;
             appState.uploadedFile = null;
             updatePreviewContainer();
-
-            appState.isAITyping = true;
-            appState.abortController = new AbortController();
-            updateUIState();
 
             try {
                 const formData = new FormData();
@@ -1180,6 +1178,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 aiContentEl.innerHTML = DOMPurify.sanitize(marked.parse(fullResponse));
                 renderCodeCopyButtons();
+                const ttsButton = aiContentEl.parentElement.querySelector('.tts-btn');
+                if (ttsButton) ttsButton.style.display = 'block';
 
                 const updatedData = await apiCall('/api/status');
                 if (updatedData.success) {
@@ -1194,8 +1194,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (aiContentEl) aiContentEl.innerHTML = `<p class="text-red-400 mt-2"><strong>Error:</strong> ${err.message}</p>`;
                     showToast(err.message, 'error');
                 }
+            } finally {
+                appState.isAITyping = false;
+                appState.abortController = null;
+                updateUIState();
             }
         } finally {
+             // This `finally` block is the crucial part of the fix.
+             // It ensures that the state is reset even if the inner try block fails.
             appState.isAITyping = false;
             appState.abortController = null;
             updateUIState();
@@ -1215,18 +1221,87 @@ document.addEventListener('DOMContentLoaded', () => {
         const aiAvatarSVG = `<svg width="20" height="20" viewBox="0 0 100 100"><path d="M35 65 L35 35 L50 50 L65 35 L65 65" stroke="white" stroke-width="8" fill="none"/></svg>`;
         const userAvatarHTML = `<div class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-white" style="${userAvatarColor}">${avatarChar}</div>`;
         const aiAvatarHTML = `<div class="ai-avatar flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-white bg-gradient-to-br from-blue-500 to-indigo-600">${aiAvatarSVG}</div>`;
+        
+        let ttsButtonHTML = '';
+        const canTTS = (appState.currentUser.plan === 'pro' || appState.currentUser.plan === 'ultra');
+        if (senderIsAI && canTTS) {
+             ttsButtonHTML = `
+                <button class="tts-btn p-1 rounded-full text-gray-400 hover:text-white transition-colors" title="Listen to response">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
+                </button>
+             `;
+        }
 
         wrapper.innerHTML = `
             ${senderIsAI ? aiAvatarHTML : userAvatarHTML}
             <div class="flex-1 min-w-0">
-                <div class="font-bold">${senderIsAI ? (appState.isStudyMode ? 'Study Buddy' : 'Myth AI') : 'You'}</div>
+                <div class="font-bold flex items-center gap-2">${senderIsAI ? (appState.isStudyMode ? 'Study Buddy' : 'Myth AI') : 'You'} ${ttsButtonHTML}</div>
                 <div class="prose prose-invert max-w-none message-content">
                     ${isStreaming ? '<div class="typing-indicator"><span></span><span></span><span></span></div>' : DOMPurify.sanitize(marked.parse(msg.content))}
                 </div>
             </div>`;
         chatWindow.appendChild(wrapper);
         chatWindow.scrollTop = chatWindow.scrollHeight;
+        
+        const ttsBtn = wrapper.querySelector('.tts-btn');
+        if (ttsBtn) {
+            ttsBtn.onclick = () => handleTTS(msg.content, ttsBtn);
+        }
+
         return wrapper;
+    }
+    
+    async function handleTTS(text, button) {
+        if (appState.audio && !appState.audio.paused) {
+            appState.audio.pause();
+            appState.audio = null;
+            button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>`;
+            return;
+        }
+
+        button.innerHTML = `<svg class="animate-spin" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>`;
+
+        const result = await apiCall('/api/tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text })
+        });
+
+        if (result.success && result.audio_data) {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const audioData = Uint8Array.from(atob(result.audio_data), c => c.charCodeAt(0)).buffer;
+            
+            // This assumes the API returns signed 16-bit PCM data at a specific sample rate
+            const sampleRate = 16000;
+            const pcm16 = new Int16Array(audioData);
+            const float32 = new Float32Array(pcm16.length);
+            for (let i = 0; i < pcm16.length; i++) {
+                float32[i] = pcm16[i] / 32768; // Normalize to -1 to 1
+            }
+
+            const audioBuffer = audioContext.createBuffer(1, float32.length, sampleRate);
+            audioBuffer.getChannelData(0).set(float32);
+
+            const source = audioContext.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(audioContext.destination);
+            source.start();
+
+            appState.audio = {
+                pause: () => source.stop(),
+                paused: false,
+            };
+            
+            source.onended = () => {
+                button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>`;
+                appState.audio = null;
+            };
+
+            button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
+        } else {
+            button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>`;
+            showToast(result.error || "Could not play audio.", "error");
+        }
     }
     
     async function createNewChat(shouldRender = true) {
@@ -1279,12 +1354,10 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const addListeners = () => {
-            // Main delegated click handler using .onclick for robustness
             appContainer.onclick = (e) => {
                 const target = e.target.closest('button');
                 if (!target) return;
 
-                // Handle buttons by ID
                 switch (target.id) {
                     case 'new-chat-btn': createNewChat(true); break;
                     case 'logout-btn': handleLogout(); break;
@@ -1295,6 +1368,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     case 'rename-chat-btn': handleRenameChat(); break;
                     case 'delete-chat-btn': handleDeleteChat(); break;
                     case 'share-chat-btn': handleShareChat(); break;
+                    case 'download-chat-btn': handleDownloadChat(); break;
                     case 'upgrade-plan-btn': renderUpgradePage(); break;
                     case 'back-to-chat-btn': renderAppUI(); break;
                     case 'upload-btn': document.getElementById('file-input')?.click(); break;
@@ -1308,7 +1382,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     case 'copy-code-btn': handleCopyClassroomCode(); break;
                 }
 
-                // Handle buttons by class
                 if (target.classList.contains('delete-user-btn')) {
                     handleAdminDeleteUser(e);
                 }
@@ -1323,7 +1396,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             };
 
-            // Specific handlers for non-button elements or complex events
             const userInput = document.getElementById('user-input');
             if (userInput) {
                 userInput.onkeydown = (e) => { 
@@ -1394,7 +1466,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (result.success) {
                     appState.chats[appState.activeChatId].title = newTitle.trim();
                     renderChatHistoryList();
-                    if (appState.activeChatId === chat.id) {
+                    if (appState.activeChatId === appState.chats[appState.activeChatId].id) {
                         document.getElementById('chat-title').textContent = newTitle.trim();
                     }
                     showToast("Chat renamed!", "success");
@@ -1442,6 +1514,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 showToast('Link copied to clipboard!', 'success');
             }, 'Copy Link');
         }
+    }
+
+    async function handleDownloadChat() {
+        if (!appState.activeChatId) return;
+        const chat = appState.chats[appState.activeChatId];
+        if (!chat || chat.messages.length === 0) {
+            showToast("No chat content to download.", "info");
+            return;
+        }
+
+        let content = `# ${chat.title}\n\n`;
+        chat.messages.forEach(msg => {
+            const sender = msg.sender === 'user' ? 'You' : 'AI';
+            content += `**${sender}:**\n${msg.content}\n\n`;
+        });
+
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${chat.title.replace(/[^a-z0-9]/gi, '_')}_chat.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast("Chat downloaded!", "success");
     }
 
     // --- UPGRADE & PAYMENT LOGIC ---
@@ -1521,6 +1617,29 @@ document.addEventListener('DOMContentLoaded', () => {
         renderLogo('app-logo-container');
         setupAppEventListeners();
         await fetchTeacherData();
+    }
+    
+    async function fetchStudentLeaderboard() {
+        const leaderboardContainer = document.getElementById('student-leaderboard-container');
+        if (!leaderboardContainer) return;
+
+        const result = await apiCall('/api/student/leaderboard');
+        if (result.success) {
+            leaderboardContainer.classList.remove('hidden');
+            let leaderboardHTML = `<h3 class="text-lg font-bold mb-2">Class Leaderboard</h3>`;
+            if (result.leaderboard.length > 0) {
+                leaderboardHTML += `<ul class="space-y-1">`;
+                result.leaderboard.forEach((student, index) => {
+                    leaderboardHTML += `<li class="flex justify-between items-center text-sm"><span class="truncate"><strong>${index + 1}.</strong> ${student.username}</span><span class="font-mono text-yellow-400">${student.streak} days</span></li>`;
+                });
+                leaderboardHTML += `</ul>`;
+            } else {
+                leaderboardHTML += `<p class="text-sm text-gray-400">No students have a streak yet.</p>`;
+            }
+            leaderboardContainer.innerHTML = leaderboardHTML;
+        } else {
+            leaderboardContainer.classList.add('hidden');
+        }
     }
 
     async function fetchAdminData() {
@@ -1603,6 +1722,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (result.success) {
             showToast('New classroom code generated!', 'success');
             await fetchTeacherData();
+        } else {
+            showToast(result.error, 'error');
         }
     }
 
@@ -1649,6 +1770,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (result.success) {
                 showToast(result.message, 'success');
                 await fetchTeacherData();
+            } else {
+                 showToast(result.error, 'error');
             }
         }
     }
@@ -1719,13 +1842,11 @@ def check_and_reset_daily_limit(user):
         user.last_message_date = today_str
         user.daily_messages = 0
         
-        # Check and update student streak
         if user.account_type == 'student':
             last_streak_date = datetime.strptime(user.last_streak_date, "%Y-%m-%d")
-            # If a day has passed since the last message, the streak is reset
             if (datetime.now() - last_streak_date).days > 1:
                 user.streak = 0
-
+            
         save_database()
 
 def get_user_data_for_frontend(user):
@@ -1943,18 +2064,16 @@ def chat_api():
         if current_user.daily_messages >= plan_details["message_limit"]:
             return jsonify({"error": f"Daily message limit of {plan_details['message_limit']} reached."}), 429
         
-        # --- Context and Persona Injection ---
         current_time = datetime.now().strftime('%A, %B %d, %Y at %I:%M %p')
         base_system_instruction = f"The current date and time is {current_time}. The user is located in Yorkton, Saskatchewan, Canada. Your developer is devector."
         
         if is_study_mode and current_user.account_type == 'student':
-            persona_instruction = "You are Study Buddy, a friendly and encouraging tutor. Your goal is to guide the user to the answer without giving it away directly. Ask leading questions, explain concepts simply, and help them break down the problem. Never just provide the final answer."
+            persona_instruction = "You are Study Buddy, a friendly, patient, and knowledgeable tutor. Your goal is to be an engaging and trustworthy partner in learning. Guide the user to the answer by asking thoughtful questions, providing simple and clear explanations, and helping them develop critical thinking skills. Never give away the answer directly. Use a warm, encouraging, and slightly informal tone to make learning fun and accessible."
         else:
             persona_instruction = "You are Myth AI, a powerful, general-purpose assistant for creative tasks, coding, and complex questions."
             
         final_system_instruction = f"{base_system_instruction}\n\n{persona_instruction}"
 
-        # --- History and File Handling ---
         history = [{"role": "user" if msg['sender'] == 'user' else 'model', "parts": [{"text": msg['content']}]} for msg in chat['messages'][-10:] if msg.get('content')]
         
         model_input_parts = []
@@ -1987,9 +2106,11 @@ def chat_api():
         chat['messages'].append(user_message_content)
         current_user.daily_messages += 1
         
-        if is_study_mode and current_user.account_type == 'student' and current_user.last_streak_date != datetime.now().strftime("%Y-%m-%d"):
-            current_user.streak += 1
-            current_user.last_streak_date = datetime.now().strftime("%Y-%m-%d")
+        if is_study_mode and current_user.account_type == 'student':
+            today_str = datetime.now().strftime("%Y-%m-%d")
+            if current_user.last_streak_date != today_str:
+                 current_user.streak += 1
+                 current_user.last_streak_date = today_str
         
         save_database()
 
@@ -2087,6 +2208,37 @@ def share_chat():
         save_database()
         return jsonify({"success": True, "share_id": chat_id})
     return jsonify({"error": "Chat not found or access denied."}), 404
+
+@app.route('/api/tts', methods=['POST'])
+@login_required
+def tts_api():
+    if not (current_user.plan == 'pro' or current_user.plan == 'ultra'):
+        return jsonify({"error": "Voice chat is a premium feature."}), 403
+
+    data = request.json
+    text = data.get('text', '').strip()
+    
+    if not text:
+        return jsonify({"error": "No text provided for TTS."}), 400
+
+    try:
+        model = genai.GenerativeModel('gemini-2.5-flash-preview-tts')
+        response = model.generate_content(
+            text,
+            generation_config=genai.GenerationConfig(
+                response_modality="AUDIO",
+                speech_config={
+                    "voice_config": {"prebuilt_voice_config": {"voice_name": "Puck"}}
+                }
+            )
+        )
+        
+        audio_data = response.candidates[0].content.parts[0].inline_data.data
+        return jsonify({"success": True, "audio_data": audio_data})
+
+    except Exception as e:
+        logging.error(f"TTS API call failed: {e}")
+        return jsonify({"error": "Failed to generate audio."}), 500
 
 # --- 10. Public Share and Payment Routes ---
 @app.route('/share/<chat_id>')
@@ -2378,8 +2530,26 @@ def get_student_chats(student_id):
         })
         
     return jsonify({"success": True, "chats": sanitized_chats})
+    
+@app.route('/api/student/leaderboard', methods=['GET'])
+@login_required
+def student_leaderboard_data():
+    if current_user.account_type != 'student' or not current_user.classroom_code:
+        return jsonify({"success": False, "error": "Leaderboard is only for students in a classroom."}), 403
 
+    classroom_students_ids = DB['classrooms'][current_user.classroom_code]['students']
+    students_data = []
+    for student_id in classroom_students_ids:
+        student = User.get(student_id)
+        if student and student.account_type == 'student':
+            students_data.append(get_user_data_for_frontend(student))
+            
+    # Sort students by streak in descending order
+    leaderboard = sorted(students_data, key=lambda x: x['streak'], reverse=True)
+    
+    return jsonify({"success": True, "leaderboard": leaderboard})
 
 # --- Main Execution ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
+
