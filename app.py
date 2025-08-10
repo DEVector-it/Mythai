@@ -337,6 +337,30 @@ HTML_CONTENT = """
                 
                 <div class="flex-shrink-0"><button id="new-chat-btn" class="w-full text-left flex items-center gap-3 p-3 rounded-lg hover:bg-gray-700/50 transition-colors duration-200"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14" /><path d="M5 12h14" /></svg> New Chat</button></div>
                 <div id="chat-history-list" class="flex-grow overflow-y-auto my-4 space-y-1 pr-1"></div>
+                
+                <!-- AdSense Placeholder Start -->
+                <div id="adsense-container" class="p-2 mt-auto">
+                    <!-- Your Google AdSense ad unit code goes here -->
+                    <!-- Example: -->
+                    <!-- 
+                    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-your_client_id"
+                         crossorigin="anonymous"></script>
+                    <ins class="adsbygoogle"
+                         style="display:block"
+                         data-ad-client="ca-pub-your_client_id"
+                         data-ad-slot="your_ad_slot_id"
+                         data-ad-format="auto"
+                         data-full-width-responsive="true"></ins>
+                    <script>
+                         (adsbygoogle = window.adsbygoogle || []).push({});
+                    </script>
+                    -->
+                    <div class="w-full h-24 bg-gray-700/50 rounded-lg flex items-center justify-center text-gray-400 text-sm">
+                        Ad Placeholder
+                    </div>
+                </div>
+                <!-- AdSense Placeholder End -->
+
                 <div class="flex-shrink-0 border-t border-gray-700 pt-2 space-y-1">
                     <div id="user-info" class="p-3 text-sm"></div>
                     <button id="upgrade-plan-btn" class="w-full text-left flex items-center gap-3 p-3 rounded-lg hover:bg-indigo-500/20 text-indigo-400 transition-colors duration-200"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6v12m-6-6h12"/></svg> Upgrade Plan</button>
@@ -1684,4 +1708,5 @@ def impersonate_user():
 # --- Main Execution ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
+
 
