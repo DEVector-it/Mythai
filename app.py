@@ -256,20 +256,20 @@ HTML_CONTENT = """
         pre:hover .copy-code-btn { opacity: 1; }
         #sidebar.hidden { transform: translateX(-100%); }
         /* Study Buddy Theme */
-        .study-buddy-mode { background-color: #052e16; color: #a7f3d0; }
-        .study-buddy-mode #sidebar { background: rgba(4, 26, 13, 0.7); }
-        .study-buddy-mode #chat-window { color: #d1fae5; }
-        .study-buddy-mode .glassmorphism { background: rgba(2, 44, 34, 0.5); border-color: rgba(52, 211, 153, 0.2); }
-        .study-buddy-mode .brand-gradient { background-image: linear-gradient(to right, #34d399, #22c55e); }
-        .study-buddy-mode #send-btn { background-image: linear-gradient(to right, #10b981, #22c55e); }
-        .study-buddy-mode #user-input { color: #d1fae5; }
-        .study-buddy-mode #user-input::placeholder { color: #6ee7b7; }
-        .study-buddy-mode .message-wrapper .font-bold { color: #a7f3d0; }
-        .study-buddy-mode .ai-avatar { background-image: linear-gradient(to right, #34d399, #22c55e); }
-        .study-buddy-mode ::-webkit-scrollbar-track { background: #064e3b; }
-        .study-buddy-mode ::-webkit-scrollbar-thumb { background: #047857; }
-        .study-buddy-mode #sidebar button:hover { background-color: rgba(5, 150, 105, 0.3); }
-        .study-buddy-mode #sidebar .bg-blue-600\/30 { background-color: rgba(16, 185, 129, 0.4); }
+        .study-buddy-mode { background-color: #fef3c7; color: #1f2937; }
+        .study-buddy-mode #sidebar { background: rgba(251, 239, 203, 0.7); color: #1f2937; }
+        .study-buddy-mode #chat-window { color: #1f2937; }
+        .study-buddy-mode .glassmorphism { background: rgba(251, 239, 203, 0.5); border-color: rgba(100, 100, 100, 0.1); }
+        .study-buddy-mode .brand-gradient { background-image: linear-gradient(to right, #f59e0b, #eab308); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .study-buddy-mode #send-btn { background-image: linear-gradient(to right, #d97706, #f59e0b); }
+        .study-buddy-mode #user-input { color: #1f2937; }
+        .study-buddy-mode #user-input::placeholder { color: #b45309; }
+        .study-buddy-mode .message-wrapper .font-bold { color: #78350f; }
+        .study-buddy-mode .ai-avatar { background-image: linear-gradient(to right, #f59e0b, #eab308); }
+        .study-buddy-mode ::-webkit-scrollbar-track { background: #fde68a; }
+        .study-buddy-mode ::-webkit-scrollbar-thumb { background: #d97706; }
+        .study-buddy-mode #sidebar button:hover { background-color: rgba(251, 239, 203, 0.5); }
+        .study-buddy-mode #sidebar .bg-blue-600\/30 { background-color: rgba(245, 158, 11, 0.4); }
         .typing-indicator span { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: currentColor; margin: 0 2px; animation: typing-bounce 1.4s infinite ease-in-out both; }
         .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
         .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
@@ -922,7 +922,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!listEl) return;
         listEl.innerHTML = '';
         Object.values(appState.chats)
-            .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+            .sort((a, b) => (b.created_at || '').localeCompare(appState.chats[a].created_at || ''))
             .forEach(chat => {
                 const itemWrapper = document.createElement('div');
                 itemWrapper.className = `w-full flex items-center justify-between p-3 rounded-lg hover:bg-gray-700/50 transition-colors duration-200 group ${chat.id === appState.activeChatId ? 'bg-blue-600/30' : ''}`;
@@ -1200,8 +1200,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateUIState();
             }
         } finally {
-             // This `finally` block is the crucial part of the fix.
-             // It ensures that the state is reset even if the inner try block fails.
             appState.isAITyping = false;
             appState.abortController = null;
             updateUIState();
@@ -2544,7 +2542,6 @@ def student_leaderboard_data():
         if student and student.account_type == 'student':
             students_data.append(get_user_data_for_frontend(student))
             
-    # Sort students by streak in descending order
     leaderboard = sorted(students_data, key=lambda x: x['streak'], reverse=True)
     
     return jsonify({"success": True, "leaderboard": leaderboard})
@@ -2552,4 +2549,5 @@ def student_leaderboard_data():
 # --- Main Execution ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
+
 
