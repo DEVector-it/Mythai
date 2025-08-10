@@ -1197,16 +1197,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- EVENT LISTENERS & HANDLERS ---
     function setupAppEventListeners() {
-        const appContainer = document.getElementById('app-container');
-        if (!appContainer) return;
-        
-        appContainer.onclick = (e) => {
+        // Use event delegation on the app container for most clicks
+        DOMElements.appContainer.addEventListener('click', (e) => {
             const target = e.target.closest('button');
             if (!target) return;
+
+            // Handle buttons inside the main app layout
             switch (target.id) {
                 case 'new-chat-btn': createNewChat(true); break;
                 case 'logout-btn': handleLogout(); break;
                 case 'teacher-logout-btn': handleLogout(); break;
+                case 'admin-logout-btn': handleLogout(); break;
                 case 'send-btn': handleSendMessage(); break;
                 case 'stop-generating-btn': appState.abortController?.abort(); break;
                 case 'rename-chat-btn': handleRenameChat(); break;
@@ -1214,36 +1215,59 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'share-chat-btn': handleShareChat(); break;
                 case 'upgrade-plan-btn': renderUpgradePage(); break;
                 case 'back-to-chat-btn': renderAppUI(); break;
-                case 'upload-btn': document.getElementById('file-input').click(); break;
+                case 'upload-btn': document.getElementById('file-input')?.click(); break;
                 case 'menu-toggle-btn': 
                     document.getElementById('sidebar')?.classList.toggle('-translate-x-full');
                     document.getElementById('sidebar-backdrop')?.classList.toggle('hidden');
                     break;
+                case 'admin-impersonate-btn': handleImpersonate(); break;
+                case 'back-to-main-login': renderAuthPage(true); break;
             }
-        };
+
+            // Handle dynamically created buttons
+            if (target.classList.contains('delete-user-btn')) {
+                handleAdminDeleteUser(e);
+            }
+            if (target.classList.contains('purchase-btn') && !target.disabled) {
+                handlePurchase(target.dataset.planid);
+            }
+        });
 
         const userInput = document.getElementById('user-input');
         if (userInput) {
-            userInput.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } };
-            userInput.oninput = () => { userInput.style.height = 'auto'; userInput.style.height = `${userInput.scrollHeight}px`; };
+            userInput.addEventListener('keydown', (e) => { 
+                if (e.key === 'Enter' && !e.shiftKey) { 
+                    e.preventDefault(); 
+                    handleSendMessage(); 
+                } 
+            });
+            userInput.addEventListener('input', () => { 
+                userInput.style.height = 'auto'; 
+                userInput.style.height = `${userInput.scrollHeight}px`; 
+            });
         }
         
         const backdrop = document.getElementById('sidebar-backdrop');
         if (backdrop) {
-            backdrop.onclick = () => {
+            backdrop.addEventListener('click', () => {
                 document.getElementById('sidebar')?.classList.add('-translate-x-full');
                 backdrop.classList.add('hidden');
-            };
+            });
         }
 
         const fileInput = document.getElementById('file-input');
         if (fileInput) {
-            fileInput.onchange = (e) => {
+            fileInput.addEventListener('change', (e) => {
                 if (e.target.files.length > 0) {
                     appState.uploadedFile = e.target.files[0];
                     updatePreviewContainer();
                 }
-            };
+            });
+        }
+        
+        const announcementForm = document.getElementById('announcement-form');
+        if(announcementForm) {
+            announcementForm.addEventListener('submit', handleSetAnnouncement);
         }
     }
 
@@ -1322,7 +1346,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const template = document.getElementById('template-upgrade-page');
         DOMElements.appContainer.innerHTML = '';
         DOMElements.appContainer.appendChild(template.content.cloneNode(true));
-        setupAppEventListeners();
+        setupAppEventListeners(); // Re-attach listeners for the new view
 
         const plansContainer = document.getElementById('plans-container');
         const plansResult = await apiCall('/api/plans');
@@ -1352,12 +1376,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 </button>
             `;
             plansContainer.appendChild(card);
-        });
-
-        plansContainer.querySelectorAll('.purchase-btn').forEach(btn => {
-            if (!btn.disabled) {
-                btn.onclick = () => handlePurchase(btn.dataset.planid);
-            }
         });
     }
 
@@ -1389,9 +1407,7 @@ document.addEventListener('DOMContentLoaded', () => {
         DOMElements.appContainer.innerHTML = '';
         DOMElements.appContainer.appendChild(template.content.cloneNode(true));
         renderLogo('admin-logo-container');
-        document.getElementById('admin-logout-btn').onclick = handleLogout;
-        document.getElementById('announcement-form').onsubmit = handleSetAnnouncement;
-        document.getElementById('admin-impersonate-btn').onclick = handleImpersonate;
+        setupAppEventListeners();
         fetchAdminData();
     }
 
@@ -1399,7 +1415,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const template = document.getElementById('template-teacher-dashboard');
         DOMElements.appContainer.innerHTML = '';
         DOMElements.appContainer.appendChild(template.content.cloneNode(true));
-        document.getElementById('teacher-logout-btn').onclick = handleLogout;
+        setupAppEventListeners();
     }
 
     async function fetchAdminData() {
@@ -1426,7 +1442,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 </td>`;
             userList.appendChild(tr);
         });
-        userList.querySelectorAll('.delete-user-btn').forEach(btn => btn.onclick = handleAdminDeleteUser);
     }
     
     async function handleSetAnnouncement(e) {
@@ -1681,6 +1696,7 @@ def chat_api():
     if not GEMINI_API_CONFIGURED:
         return jsonify({"error": "AI services are currently unavailable."}), 503
 
+    chat_id = None
     try:
         data = request.form
         chat_id = data.get('chat_id')
@@ -1711,7 +1727,6 @@ def chat_api():
         final_system_instruction = f"{base_system_instruction}\n\n{persona_instruction}"
 
         # --- History and File Handling ---
-        # Optimized history: send only last 10 messages to save tokens
         history = [{"role": "user" if msg['sender'] == 'user' else 'model', "parts": [{"text": msg['content']}]} for msg in chat['messages'][-10:] if msg.get('content')]
         
         model_input_parts = []
@@ -1737,6 +1752,11 @@ def chat_api():
         if not model_input_parts:
             return jsonify({"error": "A prompt or file is required."}), 400
 
+        # === FIX: SAVE USER MESSAGE AND UPDATE COUNT *BEFORE* THE API CALL ===
+        chat['messages'].append({'sender': 'user', 'content': prompt})
+        current_user.daily_messages += 1
+        save_database() # Save the user's prompt immediately
+
         # --- Gemini API Call ---
         model = genai.GenerativeModel(plan_details['model'], system_instruction=final_system_instruction)
         chat_session = model.start_chat(history=history)
@@ -1754,14 +1774,13 @@ def chat_api():
                 yield json.dumps({"error": f"An error occurred with the AI model: {str(e)}"})
                 return
 
+            # === FIX: SAVE AI RESPONSE AND TITLE *AFTER* THE STREAM ===
             if not full_response_text.strip():
                 logging.info(f"Received an empty response for chat {chat_id}.")
                 full_response_text = "I'm sorry, I couldn't generate a response. Please try again."
                 yield full_response_text
 
-            chat['messages'].append({'sender': 'user', 'content': prompt})
             chat['messages'].append({'sender': 'model', 'content': full_response_text})
-            current_user.daily_messages += 1
 
             if len(chat['messages']) <= 2:
                 try:
@@ -2020,4 +2039,5 @@ def impersonate_user():
 # --- Main Execution ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
+
 
