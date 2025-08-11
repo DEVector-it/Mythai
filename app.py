@@ -10,7 +10,7 @@ from io import BytesIO
 from email.mime.text import MIMEText
 from flask import Flask, Response, request, stream_with_context, session, jsonify, redirect, url_for
 from flask_login import LoginManager, UserMixin, login_user, logout_user, current_user, login_required
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 import google.generativeai as genai
@@ -25,7 +25,6 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # --- Security Check for Essential Keys ---
-# Core keys required for the application to run at all.
 REQUIRED_KEYS = [
     'SECRET_KEY', 'GEMINI_API_KEY', 'SECRET_REGISTRATION_KEY',
     'SECRET_STUDENT_KEY', 'SECRET_TEACHER_KEY', 'STRIPE_WEBHOOK_SECRET',
@@ -54,10 +53,8 @@ SITE_CONFIG = {
     "SECRET_STUDENT_KEY": os.environ.get('SECRET_STUDENT_KEY'),
     "SECRET_TEACHER_KEY": os.environ.get('SECRET_TEACHER_KEY'),
     "STRIPE_WEBHOOK_SECRET": os.environ.get('STRIPE_WEBHOOK_SECRET'),
-    # Google OAuth Config
     "GOOGLE_CLIENT_ID": os.environ.get("GOOGLE_CLIENT_ID"),
     "GOOGLE_CLIENT_SECRET": os.environ.get("GOOGLE_CLIENT_SECRET"),
-    # Mail Config for Password Reset
     "MAIL_SERVER": os.environ.get('MAIL_SERVER'),
     "MAIL_PORT": int(os.environ.get('MAIL_PORT', 587)),
     "MAIL_USE_TLS": os.environ.get('MAIL_USE_TLS', 'true').lower() in ['true', '1', 't'],
@@ -79,7 +76,6 @@ stripe.api_key = SITE_CONFIG["STRIPE_SECRET_KEY"]
 if not stripe.api_key:
     logging.warning("Stripe Secret Key is not set. Payment flows will fail.")
 
-# --- Feature Flags based on Environment Variables ---
 GOOGLE_OAUTH_ENABLED = all([SITE_CONFIG['GOOGLE_CLIENT_ID'], SITE_CONFIG['GOOGLE_CLIENT_SECRET']])
 EMAIL_ENABLED = all([SITE_CONFIG['MAIL_SERVER'], SITE_CONFIG['MAIL_USERNAME'], SITE_CONFIG['MAIL_PASSWORD']])
 
@@ -94,22 +90,21 @@ if GOOGLE_OAUTH_ENABLED:
     )
     logging.info("Google OAuth has been configured and enabled.")
 else:
-    logging.warning("Google OAuth credentials not found in .env file. Google Sign-In will be disabled.")
+    logging.warning("Google OAuth credentials not found. Google Sign-In will be disabled.")
 
 password_reset_serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
 if not EMAIL_ENABLED:
-    logging.warning("Email server credentials not found in .env file. Password reset functionality will be disabled.")
+    logging.warning("Email server credentials not found. Password reset functionality will be disabled.")
 else:
     logging.info("Email server has been configured and enabled.")
 
 
-# --- 2. Database Management (ENHANCED FOR SAFETY) ---
+# --- 2. Database Management ---
 DATA_DIR = 'data'
 DATABASE_FILE = os.path.join(DATA_DIR, 'database.json')
 DB = { "users": {}, "chats": {}, "classrooms": {}, "site_settings": {"announcement": "Welcome to Myth AI for Students!"} }
 
 def setup_database_dir():
-    """Ensures the data directory and .gitignore exist to protect user data."""
     if not os.path.exists(DATA_DIR):
         os.makedirs(DATA_DIR)
         logging.info(f"Created data directory at: {DATA_DIR}")
@@ -121,7 +116,6 @@ def setup_database_dir():
             logging.info(f"Created .gitignore in {DATA_DIR} to protect database files.")
 
 def save_database():
-    """Saves the DB to a JSON file atomically and creates a backup for safety."""
     setup_database_dir()
     if os.path.exists(DATABASE_FILE):
         backup_file = os.path.join(DATA_DIR, f"database_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json.bak")
@@ -153,7 +147,6 @@ def save_database():
             os.remove(temp_file)
 
 def load_database():
-    """Loads the database from JSON, with fallback to the most recent backup."""
     global DB
     setup_database_dir()
     if not os.path.exists(DATABASE_FILE):
@@ -201,7 +194,7 @@ def unauthorized():
 
 class User(UserMixin):
     """User model for Students, Teachers, and Admins."""
-    def __init__(self, id, username, email, password_hash, role='user', plan='student', account_type='student', daily_messages=0, last_message_date=None, classroom_code=None, streak=0, last_streak_date=None):
+    def __init__(self, id, username, email, password_hash, role='user', plan='student', account_type='student', daily_messages=0, last_message_date=None, classroom_code=None, streak=0, last_streak_date=None, message_limit_override=None):
         self.id = id
         self.username = username
         self.email = email
@@ -210,10 +203,11 @@ class User(UserMixin):
         self.plan = plan
         self.account_type = account_type
         self.daily_messages = daily_messages
-        self.last_message_date = last_message_date or datetime.now().strftime("%Y-%m-%d")
+        self.last_message_date = last_message_date or date.today().isoformat()
         self.classroom_code = classroom_code
         self.streak = streak
-        self.last_streak_date = last_streak_date or datetime.now().strftime("%Y-%m-%d")
+        self.last_streak_date = last_streak_date or date.today().isoformat()
+        self.message_limit_override = message_limit_override
 
     @staticmethod
     def get(user_id):
@@ -236,6 +230,7 @@ class User(UserMixin):
 
     @staticmethod
     def from_dict(data):
+        data.setdefault('message_limit_override', None)
         return User(**data)
 
 def user_to_dict(user):
@@ -245,7 +240,8 @@ def user_to_dict(user):
         'role': user.role, 'plan': user.plan, 'account_type': user.account_type,
         'daily_messages': user.daily_messages, 'last_message_date': user.last_message_date,
         'classroom_code': user.classroom_code, 'streak': user.streak,
-        'last_streak_date': user.last_streak_date
+        'last_streak_date': user.last_streak_date,
+        'message_limit_override': user.message_limit_override
     }
 
 @login_manager.user_loader
@@ -265,7 +261,6 @@ def initialize_database_defaults():
     if made_changes:
         save_database()
 
-# Initial load of the application
 load_database()
 with app.app_context():
     initialize_database_defaults()
@@ -274,7 +269,7 @@ with app.app_context():
 # --- 4. Plan & Rate Limiting Configuration (Student Focused) ---
 PLAN_CONFIG = {
     "student": {"name": "Student", "price_string": "$4.99 / month", "features": ["100 Daily Messages", "Study Buddy Persona", "Streak & Leaderboard", "No Image Uploads"], "color": "text-amber-400", "message_limit": 100, "can_upload": False, "model": "gemini-1.5-flash-latest"},
-    "student_pro": {"name": "Student Pro", "price_string": "$7.99 / month", "features": ["200 Daily Messages", "Image Uploads", "Study Buddy Persona", "Streak & Leaderboard"], "color": "text-amber-300", "message_limit": 200, "can_upload": True, "model": "gemini-1.5-pro-latest"}
+    "student_pro": {"name": "Student Pro", "price_string": "$7.99 / month", "features": ["200 Daily Messages", "Image Uploads", "All AI Personas", "Streak & Leaderboard"], "color": "text-amber-300", "message_limit": 200, "can_upload": True, "model": "gemini-1.5-pro-latest"}
 }
 
 rate_limit_store = {}
@@ -372,15 +367,18 @@ HTML_CONTENT = """
     <div id="toast-container" class="fixed top-6 right-6 z-[100] flex flex-col gap-2"></div>
 
     <template id="template-logo">
-        <svg width="48" height="48" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <defs>
                 <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                     <stop offset="0%" style="stop-color:#6d28d9;" />
                     <stop offset="100%" style="stop-color:#0afca6;" />
                 </linearGradient>
             </defs>
-            <path d="M50 10 C 27.9 10 10 27.9 10 50 C 10 72.1 27.9 90 50 90 C 72.1 90 90 72.1 90 50 C 90 27.9 72.1 10 50 10 Z M 50 15 C 69.3 15 85 30.7 85 50 C 85 69.3 69.3 85 50 85 C 30.7 85 15 69.3 15 50 C 15 30.7 30.7 15 50 15 Z" fill="url(#logoGradient)"/>
-            <path d="M35 65 L35 35 L50 50 L65 35 L65 65" stroke="white" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 2L2 7V17L12 22L22 17V7L12 2Z" stroke="url(#logoGradient)" stroke-width="1.5"/>
+            <path d="M12 22V12" stroke="url(#logoGradient)" stroke-width="1.5"/>
+            <path d="M22 7L12 12" stroke="url(#logoGradient)" stroke-width="1.5"/>
+            <path d="M2 7L12 12" stroke="url(#logoGradient)" stroke-width="1.5"/>
+            <path d="M7 4.5L17 9.5" stroke="url(#logoGradient)" stroke-width="1.5"/>
         </svg>
     </template>
 
@@ -455,8 +453,8 @@ HTML_CONTENT = """
                         <input type="password" id="student-password" name="password" class="w-full p-3 bg-[#3d1063]/50 rounded-lg border border-purple-800" required>
                     </div>
                     <div class="mb-6">
-                        <label for="student-classroom-code" class="block text-sm font-medium text-gray-300 mb-1">Classroom Code</label>
-                        <input type="text" id="student-classroom-code" name="classroom_code" class="w-full p-3 bg-[#3d1063]/50 rounded-lg border border-purple-800" required>
+                        <label for="student-classroom-code" class="block text-sm font-medium text-gray-300 mb-1">Classroom Code (Optional)</label>
+                        <input type="text" id="student-classroom-code" name="classroom_code" class="w-full p-3 bg-[#3d1063]/50 rounded-lg border border-purple-800">
                     </div>
                     <button type="submit" class="w-full bg-gradient-to-r from-green-500 to-teal-500 hover:opacity-90 text-white font-bold py-3 px-4 rounded-lg">Create Student Account</button>
                     <p id="student-signup-error" class="text-red-400 text-sm text-center h-4 mt-3"></p>
@@ -508,6 +506,7 @@ HTML_CONTENT = """
                     <div id="app-logo-container"></div>
                     <h1 class="text-2xl font-bold brand-gradient">Myth AI</h1>
                 </div>
+                <div id="join-classroom-container" class="flex-shrink-0 p-2"></div>
                 <div class="flex-shrink-0"><button id="new-chat-btn" class="w-full text-left flex items-center gap-3 p-3 rounded-lg hover:bg-[#3d1063]/50 transition-colors duration-200"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14" /><path d="M5 12h14" /></svg> New Chat</button></div>
                 <div id="chat-history-list" class="flex-grow overflow-y-auto my-4 space-y-1 pr-1"></div>
                 <div class="flex-shrink-0 border-t border-purple-900 pt-2 space-y-1">
@@ -525,6 +524,7 @@ HTML_CONTENT = """
                         </button>
                         <h2 id="chat-title" class="text-xl font-semibold truncate">New Chat</h2>
                     </div>
+                    <div id="ai-mode-selector-container" class="flex items-center gap-2"></div>
                     <div class="flex items-center gap-1 sm:gap-2">
                         <button id="share-chat-btn" title="Share Chat" class="p-2 rounded-lg hover:bg-[#3d1063]/50 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>
                         <button id="rename-chat-btn" title="Rename Chat" class="p-2 rounded-lg hover:bg-[#3d1063]/50 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg></button>
@@ -593,8 +593,8 @@ HTML_CONTENT = """
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                 <div class="p-6 glassmorphism rounded-lg"><h2 class="text-gray-400 text-lg">Total Users</h2><p id="admin-total-users" class="text-4xl font-bold text-white">0</p></div>
-                <div class="p-6 glassmorphism rounded-lg"><h2 class="text-gray-400 text-lg">Pro Users</h2><p id="admin-pro-users" class="text-4xl font-bold text-white">0</p></div>
-                <div class="p-6 glassmorphism rounded-lg"><h2 class="text-gray-400 text-lg">Ultra Users</h2><p id="admin-ultra-users" class="text-4xl font-bold text-white">0</p></div>
+                <div class="p-6 glassmorphism rounded-lg"><h2 class="text-gray-400 text-lg">Student Users</h2><p id="admin-student-users" class="text-4xl font-bold text-white">0</p></div>
+                <div class="p-6 glassmorphism rounded-lg"><h2 class="text-gray-400 text-lg">Student Pro Users</h2><p id="admin-student-pro-users" class="text-4xl font-bold text-white">0</p></div>
             </div>
             <div class="p-6 glassmorphism rounded-lg">
                 <h2 class="text-xl font-semibold mb-4 text-white">User Management</h2>
@@ -701,7 +701,6 @@ HTML_CONTENT = """
                                 <th class="p-2">Plan</th>
                                 <th class="p-2">Daily Messages</th>
                                 <th class="p-2">Streak</th>
-                                <th class="p-2">Last Active</th>
                                 <th class="p-2">Actions</th>
                             </tr>
                         </thead>
@@ -728,7 +727,8 @@ HTML_CONTENT = """
             abortController: null, currentUser: null,
             uploadedFile: null,
             teacherData: { classroom: null, students: [] },
-            config: { google_oauth_enabled: false, email_enabled: false }
+            config: { google_oauth_enabled: false, email_enabled: false },
+            activeAIMode: 'study_buddy'
         };
 
         const DOMElements = {
@@ -738,7 +738,6 @@ HTML_CONTENT = """
             announcementBanner: document.getElementById('announcement-banner'),
         };
         
-        // --- ROUTER & INITIALIZER ---
         const routeHandler = async () => {
             const path = window.location.pathname;
             const urlParams = new URLSearchParams(window.location.search);
@@ -758,7 +757,6 @@ HTML_CONTENT = """
             }
         };
         
-        // --- UTILITY FUNCTIONS ---
         function showToast(message, type = 'info') {
             const colors = { info: 'bg-blue-600', success: 'bg-green-600', error: 'bg-red-600' };
             const toast = document.createElement('div');
@@ -846,7 +844,6 @@ HTML_CONTENT = """
             document.getElementById('modal-instance')?.remove();
         }
         
-        // --- AUTH, PASSWORD RESET, and INITIALIZATION ---
         function renderResetPasswordPage(token) {
             const template = document.getElementById('template-reset-password-page');
             DOMElements.appContainer.innerHTML = '';
@@ -914,7 +911,7 @@ HTML_CONTENT = """
             
             document.getElementById('auth-toggle-btn').onclick = renderStudentSignupPage;
             document.getElementById('forgot-password-link').onclick = handleForgotPassword;
-            document.getElementById('teacher-signup-link').onclick = renderTeacherSignupPage;
+            document.getElementById('teacher-signup-link').onclick = renderTeacherLoginPage;
             document.getElementById('special-auth-link').onclick = renderSpecialAuthPage;
 
             document.getElementById('auth-form').onsubmit = async (e) => {
@@ -966,12 +963,21 @@ HTML_CONTENT = """
             };
         }
 
+        function renderTeacherLoginPage() {
+            // Re-uses auth page template for teacher login
+            renderAuthPage();
+            document.getElementById('auth-title').textContent = "Teacher Portal";
+            document.getElementById('auth-subtitle').textContent = "Sign in to your teacher account.";
+            document.getElementById('auth-toggle-btn').onclick = renderTeacherSignupPage;
+            document.getElementById('auth-toggle-btn').textContent = "Don't have a teacher account? Sign Up";
+        }
+
         function renderTeacherSignupPage() {
             const template = document.getElementById('template-teacher-signup-page');
             DOMElements.appContainer.innerHTML = '';
             DOMElements.appContainer.appendChild(template.content.cloneNode(true));
             renderLogo('teacher-signup-logo-container');
-            document.getElementById('back-to-main-login').onclick = () => renderAuthPage(true);
+            document.getElementById('back-to-main-login').onclick = renderTeacherLoginPage;
             
             document.getElementById('teacher-signup-form').onsubmit = async (e) => {
                 e.preventDefault();
@@ -1060,6 +1066,8 @@ HTML_CONTENT = """
             renderActiveChat();
             updateUserInfo();
             setupAppEventListeners();
+            renderJoinClassroom();
+            renderAIModeSelector();
             fetchStudentLeaderboard();
         }
         async function renderActiveChat(){
@@ -1125,7 +1133,7 @@ HTML_CONTENT = """
             const avatarColor = `hsl(${username.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % 360}, 50%, 60%)`;
             userInfoDiv.innerHTML = `<div class="flex items-center gap-3"><div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-bold text-white" style="background-color: ${avatarColor};">${username[0].toUpperCase()}</div><div><div class="font-semibold">${username}</div><div class="text-xs ${planDetails.color}">${planDetails.name} Plan</div></div></div>`;
             const limitDisplay = document.getElementById('message-limit-display');
-            if(limitDisplay) limitDisplay.textContent = `Daily Messages: ${appState.currentUser.daily_messages} / ${planDetails.message_limit}`;
+            if(limitDisplay) limitDisplay.textContent = `Daily Messages: ${appState.currentUser.daily_messages} / ${appState.currentUser.message_limit}`;
         }
         function updateUIState(){
             const sendBtn = document.getElementById('send-btn');
@@ -1165,6 +1173,13 @@ HTML_CONTENT = """
         async function handleSendMessage(){
             const userInput = document.getElementById('user-input');
             if (!userInput) return;
+
+            if (appState.currentUser.account_type === 'student' && !appState.currentUser.classroom_code) {
+                showToast("You must join a classroom before you can send messages.", "error");
+                handleJoinClassroom();
+                return;
+            }
+
             const prompt = userInput.value.trim();
             if ((!prompt && !appState.uploadedFile) || appState.isAITyping) return;
             appState.isAITyping = true;
@@ -1185,6 +1200,7 @@ HTML_CONTENT = """
                 const formData = new FormData();
                 formData.append('chat_id', appState.activeChatId);
                 formData.append('prompt', prompt);
+                formData.append('ai_mode', appState.activeAIMode);
                 if (appState.uploadedFile) {
                     formData.append('file', appState.uploadedFile);
                     appState.uploadedFile = null;
@@ -1310,12 +1326,21 @@ HTML_CONTENT = """
                     case 'back-to-main-login': renderAuthPage(true); break;
                     case 'teacher-gen-code-btn': handleGenerateClassroomCode(); break;
                     case 'copy-code-btn': handleCopyClassroomCode(); break;
+                    case 'join-classroom-btn': handleJoinClassroom(); break;
                 }
                 if (target.classList.contains('delete-user-btn')) handleAdminDeleteUser(target.dataset.userid, target.dataset.username);
                 if (target.classList.contains('purchase-btn') && !target.disabled) handlePurchase(target.dataset.planid);
                 if (target.classList.contains('view-student-chats-btn')) handleViewStudentChats(target.dataset.userid, target.dataset.username);
                 if (target.classList.contains('kick-student-btn')) handleKickStudent(target.dataset.userid, target.dataset.username);
+                if (target.classList.contains('extend-limit-btn')) handleExtendLimit(target.dataset.userid, target.dataset.username);
             };
+
+            DOMElements.appContainer.onchange = (e) => {
+                if (e.target.id === 'ai-mode-selector') {
+                    appState.activeAIMode = e.target.value;
+                }
+            };
+            
             const userInput = document.getElementById('user-input');
             if (userInput) {
                 userInput.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } };
@@ -1463,14 +1488,13 @@ HTML_CONTENT = """
             if (plansResult.success) {
                 const { plans, user_plan } = plansResult;
                 Object.keys(plans).forEach(planId => {
-                    // Only show student plans
                     if (!planId.startsWith('student')) return;
                     
                     const plan = plans[planId];
                     const card = document.createElement('div');
                     const isCurrent = planId === user_plan;
                     card.className = `p-8 glassmorphism rounded-lg border-2 ${isCurrent ? 'border-green-500' : 'border-purple-800'}`;
-                    card.innerHTML = `<h2 class="text-2xl font-bold text-center ${plan.color}">${plan.name}</h2><p class="text-4xl font-bold text-center my-4 text-white">${plan.price_string}</p><ul class="space-y-2 text-gray-300 mb-6">${plan.features.map(f => `<li>✓ ${f}</li>`).join('')}</ul><button ${isCurrent} data-planid="${planId}" class="purchase-btn w-full mt-6 font-bold py-3 px-4 rounded-lg transition-opacity ${isCurrent ? 'bg-slate-600 cursor-not-allowed' : 'bg-gradient-to-r from-purple-600 to-teal-500 hover:opacity-90'}">${isCurrent ? 'Current Plan' : 'Upgrade'}</button>`;
+                    card.innerHTML = `<h2 class="text-2xl font-bold text-center ${plan.color}">${plan.name}</h2><p class="text-4xl font-bold text-center my-4 text-white">${plan.price_string}</p><ul class="space-y-2 text-gray-300 mb-6">${plan.features.map(f => `<li>✓ ${f}</li>`).join('')}</ul><button ${isCurrent ? 'disabled' : ''} data-planid="${planId}" class="purchase-btn w-full mt-6 font-bold py-3 px-4 rounded-lg transition-opacity ${isCurrent ? 'bg-slate-600 cursor-not-allowed' : 'bg-gradient-to-r from-purple-600 to-teal-500 hover:opacity-90'}">${isCurrent ? 'Current Plan' : 'Upgrade'}</button>`;
                     plansContainer.appendChild(card);
                 });
             }
@@ -1505,7 +1529,7 @@ HTML_CONTENT = """
         }
         async function fetchStudentLeaderboard(){
             const leaderboardContainer = document.getElementById('student-leaderboard-container');
-            if (!leaderboardContainer) return;
+            if (!leaderboardContainer || appState.currentUser.account_type !== 'student') return;
             const result = await apiCall('/api/student/leaderboard');
             if (result.success && result.leaderboard.length > 0) {
                 leaderboardContainer.classList.remove('hidden');
@@ -1521,8 +1545,8 @@ HTML_CONTENT = """
             const data = await apiCall('/api/admin_data');
             if (!data.success) return;
             document.getElementById('admin-total-users').textContent = data.stats.total_users;
-            document.getElementById('admin-pro-users').textContent = data.stats.pro_users;
-            document.getElementById('admin-ultra-users').textContent = data.stats.ultra_users;
+            document.getElementById('admin-student-users').textContent = data.stats.student_users;
+            document.getElementById('admin-student-pro-users').textContent = data.stats.student_pro_users;
             document.getElementById('announcement-input').value = data.announcement;
             const userList = document.getElementById('admin-user-list');
             userList.innerHTML = '';
@@ -1544,7 +1568,7 @@ HTML_CONTENT = """
             students.forEach(s => {
                 const tr = document.createElement('tr');
                 tr.className = 'border-b border-purple-800/50';
-                tr.innerHTML = `<td class="p-2">${s.username}</td><td class="p-2">${s.plan}</td><td class="p-2">${s.daily_messages}/${s.message_limit}</td><td class="p-2">${s.streak} days</td><td class="p-2">${s.last_message_date}</td><td class="p-2 flex gap-2"><button data-userid="${s.id}" data-username="${s.username}" class="view-student-chats-btn text-xs px-2 py-1 rounded bg-purple-600">View</button><button data-userid="${s.id}" data-username="${s.username}" class="kick-student-btn text-xs px-2 py-1 rounded bg-red-600">Kick</button></td>`;
+                tr.innerHTML = `<td class="p-2">${s.username}</td><td class="p-2">${s.plan}</td><td class="p-2">${s.daily_messages}/${s.message_limit}</td><td class="p-2">${s.streak} days</td><td class="p-2 flex gap-2"><button data-userid="${s.id}" data-username="${s.username}" class="view-student-chats-btn text-xs px-2 py-1 rounded bg-purple-600">View</button><button data-userid="${s.id}" data-username="${s.username}" class="extend-limit-btn text-xs px-2 py-1 rounded bg-green-600">Limit</button><button data-userid="${s.id}" data-username="${s.username}" class="kick-student-btn text-xs px-2 py-1 rounded bg-red-600">Kick</button></td>`;
                 studentListEl.appendChild(tr);
             });
             const leaderboardEl = document.getElementById('teacher-leaderboard');
@@ -1659,6 +1683,89 @@ HTML_CONTENT = """
             }, 'Impersonate');
         }
 
+        function renderJoinClassroom() {
+            const container = document.getElementById('join-classroom-container');
+            if (!container || appState.currentUser.account_type !== 'student' || appState.currentUser.classroom_code) {
+                if(container) container.innerHTML = '';
+                return;
+            }
+            container.innerHTML = `<button id="join-classroom-btn" class="w-full text-left flex items-center gap-3 p-3 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors duration-200"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg> Join Classroom</button>`;
+        }
+
+        function handleJoinClassroom() {
+            const body = document.createElement('div');
+            body.innerHTML = `
+                <p class="mb-4 text-gray-400">Enter the classroom code provided by your teacher.</p>
+                <input type="text" id="modal-input" class="w-full p-3 bg-[#3d1063]/50 rounded-lg border border-purple-800" placeholder="CLASSCODE">
+                <p id="modal-error" class="text-red-400 text-sm h-4 mt-2"></p>
+            `;
+            openModal('Join Classroom', body, async () => {
+                const code = document.getElementById('modal-input').value.trim().toUpperCase();
+                const errorEl = document.getElementById('modal-error');
+                if (!code) {
+                    errorEl.textContent = 'Classroom code is required.';
+                    return;
+                }
+                const result = await apiCall('/api/student/join_classroom', {
+                    method: 'POST',
+                    body: JSON.stringify({ classroom_code: code }),
+                });
+                if (result.success) {
+                    appState.currentUser = result.user;
+                    updateUserInfo();
+                    renderJoinClassroom();
+                    fetchStudentLeaderboard();
+                    closeModal();
+                    showToast('Successfully joined classroom!', 'success');
+                } else {
+                    errorEl.textContent = result.error;
+                }
+            }, 'Join');
+        }
+
+        function renderAIModeSelector() {
+            const container = document.getElementById('ai-mode-selector-container');
+            if (!container || appState.currentUser.account_type !== 'student') return;
+
+            container.innerHTML = `
+                <select id="ai-mode-selector" class="bg-[#3d1063]/50 border border-purple-800 text-white text-sm rounded-lg focus:ring-green-400 focus:border-green-400 block p-2">
+                    <option value="study_buddy">Study Buddy</option>
+                    <option value="quiz_master">Quiz Master</option>
+                    <option value="practice_partner">Practice Partner</option>
+                    <option value="test_proctor">Test Proctor</option>
+                </select>
+            `;
+            document.getElementById('ai-mode-selector').value = appState.activeAIMode;
+        }
+
+        function handleExtendLimit(studentId, studentUsername) {
+            const body = document.createElement('div');
+            body.innerHTML = `
+                <p class="mb-4 text-gray-400">Set a new daily message limit for <strong>${escapeHTML(studentUsername)}</strong> for today.</p>
+                <input type="number" id="modal-input" class="w-full p-3 bg-[#3d1063]/50 rounded-lg border border-purple-800" placeholder="e.g., 50">
+                <p id="modal-error" class="text-red-400 text-sm h-4 mt-2"></p>
+            `;
+            openModal(`Extend Limit for ${escapeHTML(studentUsername)}`, body, async () => {
+                const limit = document.getElementById('modal-input').value;
+                const errorEl = document.getElementById('modal-error');
+                if (!limit || isNaN(parseInt(limit)) || parseInt(limit) <= 0) {
+                    errorEl.textContent = 'Please enter a valid positive number.';
+                    return;
+                }
+                const result = await apiCall('/api/teacher/extend_limit', {
+                    method: 'POST',
+                    body: JSON.stringify({ student_id: studentId, new_limit: parseInt(limit) }),
+                });
+                if (result.success) {
+                    closeModal();
+                    showToast(result.message, 'success');
+                    fetchTeacherData();
+                } else {
+                    errorEl.textContent = result.error;
+                }
+            }, 'Set Limit');
+        }
+
         // --- INITIAL LOAD ---
         routeHandler();
     });
@@ -1670,7 +1777,6 @@ HTML_CONTENT = """
 # --- 7. Backend Helper Functions ---
 
 def send_password_reset_email(user):
-    """Generates a reset token and sends the email."""
     if not EMAIL_ENABLED:
         logging.error("Attempted to send email, but mail is not configured.")
         return False
@@ -1695,31 +1801,48 @@ def send_password_reset_email(user):
         logging.error(f"Failed to send password reset email to {user.email}: {e}")
         return False
 
-def check_and_reset_daily_limit(user):
-    """Resets a user's daily message count and checks streak."""
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    if user.last_message_date != today_str:
-        user.last_message_date = today_str
+def check_and_update_streak(user):
+    """
+    Correctly updates a student's daily message count and streak.
+    - Resets daily messages if it's a new day.
+    - Increments streak if it's the next consecutive day.
+    - Resets streak if a day was missed.
+    """
+    if user.account_type != 'student':
+        return
+
+    today = date.today()
+    last_message_day = date.fromisoformat(user.last_message_date)
+    last_streak_day = date.fromisoformat(user.last_streak_date)
+
+    if last_message_day < today:
         user.daily_messages = 0
-        if user.account_type == 'student':
-            try:
-                last_streak_date = datetime.strptime(user.last_streak_date, "%Y-%m-%d")
-                if (datetime.now().date() - last_streak_date.date()).days > 1:
-                    user.streak = 0
-            except (ValueError, TypeError):
-                user.streak = 0
-        save_database()
+        user.last_message_date = today.isoformat()
+        
+        days_diff = (today - last_streak_day).days
+        if days_diff == 1:
+            user.streak += 1
+            logging.info(f"Streak for {user.username} incremented to {user.streak}")
+        elif days_diff > 1:
+            user.streak = 1 # Start a new streak
+            logging.info(f"Streak for {user.username} reset to 1 after missing days.")
+        
+        user.last_streak_date = today.isoformat()
+        # No need to save here, will be saved in the calling function
 
 def get_user_data_for_frontend(user):
     """Prepares user data for sending to the frontend."""
     if not user: return {}
-    check_and_reset_daily_limit(user)
+    
     plan_details = PLAN_CONFIG.get(user.plan, PLAN_CONFIG['student'])
+    message_limit = user.message_limit_override if user.message_limit_override is not None else plan_details["message_limit"]
+
     return {
         "id": user.id, "username": user.username, "email": user.email, "role": user.role, "plan": user.plan,
         "account_type": user.account_type, "daily_messages": user.daily_messages,
-        "message_limit": plan_details["message_limit"], "can_upload": plan_details["can_upload"],
-        "is_student_in_class": user.account_type == 'student' and user.classroom_code is not None,
+        "message_limit": message_limit, 
+        "can_upload": plan_details["can_upload"],
+        "classroom_code": user.classroom_code,
         "streak": user.streak,
     }
 
@@ -1754,21 +1877,27 @@ def student_signup():
     email = data.get('email', '').strip().lower()
     classroom_code = data.get('classroom_code', '').strip().upper()
 
-    if not all([username, password, email, classroom_code]) or len(username) < 3 or len(password) < 6 or '@' not in email:
-        return jsonify({"error": "All fields are required."}), 400
+    if not all([username, password, email]) or len(username) < 3 or len(password) < 6 or '@' not in email:
+        return jsonify({"error": "Valid email, username, and password are required."}), 400
     if User.get_by_username(username): return jsonify({"error": "Username already exists."}), 409
     if User.get_by_email(email): return jsonify({"error": "Email already in use."}), 409
-    if classroom_code not in DB['classrooms']: return jsonify({"error": "Invalid classroom code."}), 403
+    
+    final_code = None
+    if classroom_code:
+        if classroom_code not in DB['classrooms']: return jsonify({"error": "Invalid classroom code."}), 403
+        final_code = classroom_code
 
-    new_user = User(id=username, username=username, email=email, password_hash=generate_password_hash(password), account_type='student', plan='student', classroom_code=classroom_code)
+    new_user = User(id=username, username=username, email=email, password_hash=generate_password_hash(password), account_type='student', plan='student', classroom_code=final_code)
     DB['users'][new_user.id] = new_user
-    DB['classrooms'][classroom_code]['students'].append(new_user.id)
+    if final_code:
+        DB['classrooms'][final_code]['students'].append(new_user.id)
+    
     save_database()
     login_user(new_user, remember=True)
     return jsonify({
         "success": True, "user": get_user_data_for_frontend(new_user),
         "chats": {}, "settings": DB['site_settings'],
-        "config": {"google_oauth_enabled": GOOGLE_OAUTH_ENABLED, "email_enabled": EMAIL_ENABLED}
+        "config": {"google_oauth_enabled": False, "email_enabled": EMAIL_ENABLED}
     })
 
 @app.route('/api/teacher_signup', methods=['POST'])
@@ -1786,14 +1915,14 @@ def teacher_signup():
     if User.get_by_username(username): return jsonify({"error": "Username already exists."}), 409
     if User.get_by_email(email): return jsonify({"error": "Email already in use."}), 409
 
-    new_user = User(id=username, username=username, email=email, password_hash=generate_password_hash(password), account_type='teacher', plan='student_pro', role='user') # Teachers get a pro plan
+    new_user = User(id=username, username=username, email=email, password_hash=generate_password_hash(password), account_type='teacher', plan='student_pro', role='user')
     DB['users'][new_user.id] = new_user
     save_database()
     login_user(new_user, remember=True)
     return jsonify({
         "success": True, "user": get_user_data_for_frontend(new_user),
         "chats": {}, "settings": DB['site_settings'],
-        "config": {"google_oauth_enabled": GOOGLE_OAUTH_ENABLED, "email_enabled": EMAIL_ENABLED}
+        "config": {"google_oauth_enabled": False, "email_enabled": EMAIL_ENABLED}
     })
 
 @app.route('/api/login', methods=['POST'])
@@ -1809,18 +1938,10 @@ def login():
             "success": True, "user": get_user_data_for_frontend(user),
             "chats": get_all_user_chats(user.id),
             "settings": DB['site_settings'],
-            "config": {"google_oauth_enabled": GOOGLE_OAUTH_ENABLED, "email_enabled": EMAIL_ENABLED}
+            "config": {"google_oauth_enabled": False, "email_enabled": EMAIL_ENABLED}
         })
     return jsonify({"error": "Invalid username or password."}), 401
     
-@app.route('/api/login/google')
-def google_login():
-    return redirect(url_for('index')) # Disabled for student-only focus
-
-@app.route('/authorize')
-def authorize():
-    return redirect(url_for('index')) # Disabled for student-only focus
-
 @app.route('/api/request-password-reset', methods=['POST'])
 @rate_limited()
 def request_password_reset():
@@ -1830,7 +1951,6 @@ def request_password_reset():
     user = User.get_by_email(email)
     if user:
         send_password_reset_email(user)
-    # Always return success to prevent user enumeration.
     return jsonify({"success": True, "message": "If an account with that email exists, a reset link has been sent."})
 
 @app.route('/api/reset-with-token', methods=['POST'])
@@ -1866,7 +1986,7 @@ def logout():
 
 @app.route('/api/status')
 def status():
-    config = {"google_oauth_enabled": GOOGLE_OAUTH_ENABLED, "email_enabled": EMAIL_ENABLED}
+    config = {"google_oauth_enabled": False, "email_enabled": EMAIL_ENABLED}
     if current_user.is_authenticated:
         return jsonify({
             "logged_in": True, "user": get_user_data_for_frontend(current_user),
@@ -1885,7 +2005,7 @@ def special_signup():
     if not all([username, password]): return jsonify({"error": "Username and password are required."}), 400
     if User.get_by_username(username): return jsonify({"error": "Username already exists."}), 409
     
-    admin_email = f"{username}@example.com" # Placeholder email for admin
+    admin_email = f"{username}@example.com"
     new_user = User(id=username, username=username, email=admin_email, password_hash=generate_password_hash(password), role='admin', plan='student_pro', account_type='admin')
     DB['users'][new_user.id] = new_user
     save_database()
@@ -1893,7 +2013,7 @@ def special_signup():
     return jsonify({
         "success": True, "user": get_user_data_for_frontend(new_user), 
         "settings": DB['site_settings'],
-        "config": {"google_oauth_enabled": GOOGLE_OAUTH_ENABLED, "email_enabled": EMAIL_ENABLED}
+        "config": {"google_oauth_enabled": False, "email_enabled": EMAIL_ENABLED}
     })
 
 
@@ -1904,20 +2024,33 @@ def special_signup():
 def chat_api():
     if not GEMINI_API_CONFIGURED: return jsonify({"error": "AI services are currently unavailable."}), 503
     
+    if current_user.account_type == 'student' and not current_user.classroom_code:
+        return jsonify({"error": "You must join a classroom to start chatting."}), 403
+
     data = request.form
     chat_id = data.get('chat_id')
     prompt = data.get('prompt', '').strip()
+    ai_mode = data.get('ai_mode', 'study_buddy')
     
     if not chat_id: return jsonify({"error": "Missing chat identifier."}), 400
     chat = DB['chats'].get(chat_id)
     if not chat or chat.get('user_id') != current_user.id: return jsonify({"error": "Chat not found or access denied."}), 404
 
-    check_and_reset_daily_limit(current_user)
-    plan_details = PLAN_CONFIG.get(current_user.plan, PLAN_CONFIG['student'])
-    if current_user.daily_messages >= plan_details["message_limit"]:
-        return jsonify({"error": f"Daily message limit of {plan_details['message_limit']} reached."}), 429
+    check_and_update_streak(current_user)
     
-    system_instruction = "You are Study Buddy, an enthusiastic and encouraging tutor AI. Your goal is to help students understand concepts without giving direct answers. Use the Socratic method, ask guiding questions, and break down complex problems into smaller steps. Always be patient and positive."
+    plan_details = PLAN_CONFIG.get(current_user.plan, PLAN_CONFIG['student'])
+    message_limit = current_user.message_limit_override if current_user.message_limit_override is not None else plan_details["message_limit"]
+    
+    if current_user.daily_messages >= message_limit:
+        return jsonify({"error": f"Daily message limit of {message_limit} reached."}), 429
+    
+    system_instructions = {
+        "study_buddy": "You are Study Buddy, an enthusiastic and encouraging tutor AI. Your goal is to help students understand concepts without giving direct answers. Use the Socratic method, ask guiding questions, and break down complex problems into smaller steps. Always be patient and positive.",
+        "quiz_master": "You are Quiz Master. Your role is to quiz the student on the topic they provide. Ask multiple-choice or short-answer questions. After they answer, tell them if they are correct and provide a brief explanation.",
+        "practice_partner": "You are a Practice Partner. The student will give you a topic. Your role is to generate practice problems or scenarios related to that topic. Do not solve them, but provide hints if asked.",
+        "test_proctor": "You are a Test Proctor. You are strict and formal. The student will ask for a test on a subject. You will provide a series of difficult questions one by one. Do not provide answers or hints until the student says 'I am finished'."
+    }
+    system_instruction = system_instructions.get(ai_mode, system_instructions['study_buddy'])
 
     history = [{"role": "user" if msg['sender'] == 'user' else 'model', "parts": [{"text": msg['content']}]} for msg in chat['messages'][-10:] if msg.get('content')]
     
@@ -2030,13 +2163,11 @@ def share_chat():
 def view_shared_chat(chat_id):
     chat = DB['chats'].get(chat_id)
     if not chat or not chat.get('is_public'): return "Chat not found or is not public.", 404
-    # Simple HTML rendering for shared chat
     return f"<h1>{chat['title']}</h1>" + "".join([f"<p><b>{msg['sender']}:</b> {msg['content']}</p>" for msg in chat['messages']])
 
 @app.route('/api/plans')
 @login_required
 def get_plans():
-    # Filter for student plans only
     student_plans = {pid: p for pid, p in PLAN_CONFIG.items() if pid.startswith('student')}
     return jsonify({
         "success": True, 
@@ -2101,7 +2232,7 @@ def stripe_webhook():
         customer = stripe.Customer.retrieve(data_object.customer)
         user = User.get_by_email(customer.email)
         if user and user.plan == 'student_pro':
-            user.plan = 'student' # Downgrade to regular student, not free
+            user.plan = 'student'
             save_database()
             logging.info(f"User {user.id} subscription ended; downgraded to student.")
     return 'Success', 200
@@ -2206,10 +2337,45 @@ def student_leaderboard_data():
     students_data = [get_user_data_for_frontend(User.get(sid)) for sid in student_ids if User.get(sid)]
     return jsonify({"success": True, "leaderboard": sorted(students_data, key=lambda x: x['streak'], reverse=True)})
 
+@app.route('/api/student/join_classroom', methods=['POST'])
+@login_required
+def join_classroom():
+    if current_user.account_type != 'student':
+        return jsonify({"error": "Only students can join classrooms."}), 403
+    
+    code = request.json.get('classroom_code', '').strip().upper()
+    if not code:
+        return jsonify({"error": "Classroom code is required."}), 400
+    if code not in DB['classrooms']:
+        return jsonify({"error": "Invalid classroom code."}), 404
+    
+    current_user.classroom_code = code
+    if current_user.id not in DB['classrooms'][code]['students']:
+        DB['classrooms'][code]['students'].append(current_user.id)
+    
+    save_database()
+    return jsonify({"success": True, "user": get_user_data_for_frontend(current_user)})
+
+@app.route('/api/teacher/extend_limit', methods=['POST'])
+@teacher_required
+def extend_limit():
+    student_id = request.json.get('student_id')
+    new_limit = request.json.get('new_limit')
+    
+    student = User.get(student_id)
+    if not student or student.account_type != 'student':
+        return jsonify({"error": "Student not found."}), 404
+    if not student.classroom_code or DB['classrooms'].get(student.classroom_code, {}).get('teacher_id') != current_user.id:
+        return jsonify({"error": "This student is not in your classroom."}), 403
+    if not isinstance(new_limit, int) or new_limit <= 0:
+        return jsonify({"error": "Invalid limit provided."}), 400
+        
+    student.message_limit_override = new_limit
+    save_database()
+    return jsonify({"success": True, "message": f"Message limit for {student.username} set to {new_limit} for today."})
+
 
 # --- Main Execution ---
 if __name__ == '__main__':
-    # Use the PORT environment variable if available, for compatibility with hosting platforms.
     port = int(os.environ.get('PORT', 5000))
-    # Set debug=False for production environments.
     app.run(host='0.0.0.0', port=port, debug=True)
