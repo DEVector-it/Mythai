@@ -1,55 +1,34 @@
-envVars:
+services:
+  - type: web
+    name: myth-ai-chat
+    env: python
+    plan: free # or "starter" for a more powerful instance
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn --worker-tmp-dir /dev/shm python:app"
+    envVars:
       - key: PYTHON_VERSION
         value: 3.11
-      - key: GEMINI_API_KEY
-        fromService:
-          type: secret_file
-          name: gemini_api_key
-          key: GEMINI_API_KEY
       - key: SECRET_KEY
-        generateValue: true
-      - key: SECRET_REGISTRATION_KEY
-        fromService:
-          type: secret_file
-          name: my_secrets
-          key: SECRET_REGISTRATION_KEY
-      - key: SECRET_STUDENT_KEY
-        fromService:
-          type: secret_file
-          name: my_secrets
-          key: SECRET_STUDENT_KEY
-      - key: SECRET_TEACHER_KEY
-        fromService:
-          type: secret_file
-          name: my_secrets
-          key: SECRET_TEACHER_KEY
+        value: "TrQ8n!zP*3s@^5yX#bA2vGc&9hF$@kLw"
+      - key: ADMIN_PASSWORD
+        value: "Admin123"
+      - key: GEMINI_API_KEY
+        value: "AIzaSyDsDCYNU1cf0zOW7rISyRZZH-l5CWh-a9U"
       - key: STRIPE_SECRET_KEY
-        fromService:
-          type: secret_file
-          name: my_secrets
-          key: STRIPE_SECRET_KEY
+        value: "sk_test_51Ru4xPBSm9qhr9EvjpPnirDK8YhBI8ddhYhdstvnLCT1fIvea33ldQ3uGR2s6lnC1139diLglX3UUjPMMW17xxdS00gQ4jfOkR"
       - key: STRIPE_PUBLIC_KEY
-        fromService:
-          type: secret_file
-          name: my_secrets
-          key: STRIPE_PUBLIC_KEY
+        value: "pk_test_51Ru4xPBSm9qhr9Ev02LOLySoFIztGhmrgUebvTUJtaRO9TFVJE0GwXSlNe3Nd489WpxmrQNIzIoRAxfuhtE0f24o00e6WUfhCb"
       - key: STRIPE_PRO_PRICE_ID
-        fromService:
-          type: secret_file
-          name: my_secrets
-          key: STRIPE_PRO_PRICE_ID
+        value: "price_prod_SpkaunDFtPrMjf"
       - key: STRIPE_ULTRA_PRICE_ID
-        fromService:
-          type: secret_file
-          name: my_secrets
-          key: STRIPE_ULTRA_PRICE_ID
+        value: "price_... # <-- FIX THIS: Add a valid ID from your Stripe Dashboard"
       - key: STRIPE_STUDENT_PRICE_ID
-        fromService:
-          type: secret_file
-          name: my_secrets
-          key: STRIPE_STUDENT_PRICE_ID
+        value: "price_... # <-- FIX THIS: Add a valid ID from your Stripe Dashboard"
+      - key: SECRET_REGISTRATION_KEY
+        value: "Adminlogin123"
+      - key: SECRET_TEACHER_KEY
+        value: "Cttcs"
+      - key: SECRET_STUDENT_KEY
+        value: "d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5"
       - key: YOUR_DOMAIN
-        fromService:
-          type: secret_file
-          name: my_secrets
-          key: YOUR_DOMAIN
+        value: "https://myth-1.onrender.com"
