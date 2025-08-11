@@ -7,3 +7,4 @@ stripe
 Pillow
 gunicorn
 authlib
+flask_talisman
