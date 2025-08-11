@@ -1,5 +1,11 @@
+# requirements.txt
 Flask
 Flask-Login
+Flask-SQLAlchemy
+Flask-Migrate
+Flask-Talisman
+Flask-WTF
+Flask-Limiter
 Werkzeug
 google-generativeai
 python-dotenv
@@ -7,4 +13,5 @@ stripe
 Pillow
 gunicorn
 authlib
-flask_talisman
+itsdangerous
+email-validator
