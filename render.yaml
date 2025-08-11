@@ -1,19 +1,55 @@
-services:
-  - type: web
-    name: myth-ai-chat
-    env: python
-    plan: free # or "starter" for a more powerful instance
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn --worker-tmp-dir /dev/shm app:app"
-    envVars:
+envVars:
       - key: PYTHON_VERSION
         value: 3.11
       - key: GEMINI_API_KEY
-        # This is a secret! Set its value in the Render dashboard, not here.
         fromService:
           type: secret_file
           name: gemini_api_key
           key: GEMINI_API_KEY
       - key: SECRET_KEY
-        # This is a secret! Generate a value in the Render dashboard.
         generateValue: true
+      - key: SECRET_REGISTRATION_KEY
+        fromService:
+          type: secret_file
+          name: my_secrets
+          key: SECRET_REGISTRATION_KEY
+      - key: SECRET_STUDENT_KEY
+        fromService:
+          type: secret_file
+          name: my_secrets
+          key: SECRET_STUDENT_KEY
+      - key: SECRET_TEACHER_KEY
+        fromService:
+          type: secret_file
+          name: my_secrets
+          key: SECRET_TEACHER_KEY
+      - key: STRIPE_SECRET_KEY
+        fromService:
+          type: secret_file
+          name: my_secrets
+          key: STRIPE_SECRET_KEY
+      - key: STRIPE_PUBLIC_KEY
+        fromService:
+          type: secret_file
+          name: my_secrets
+          key: STRIPE_PUBLIC_KEY
+      - key: STRIPE_PRO_PRICE_ID
+        fromService:
+          type: secret_file
+          name: my_secrets
+          key: STRIPE_PRO_PRICE_ID
+      - key: STRIPE_ULTRA_PRICE_ID
+        fromService:
+          type: secret_file
+          name: my_secrets
+          key: STRIPE_ULTRA_PRICE_ID
+      - key: STRIPE_STUDENT_PRICE_ID
+        fromService:
+          type: secret_file
+          name: my_secrets
+          key: STRIPE_STUDENT_PRICE_ID
+      - key: YOUR_DOMAIN
+        fromService:
+          type: secret_file
+          name: my_secrets
+          key: YOUR_DOMAIN
