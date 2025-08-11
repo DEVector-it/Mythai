@@ -325,7 +325,7 @@ HTML_CONTENT = """
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1136294351029434"
-     crossorigin="anonymous"></script>
+      crossorigin="anonymous"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -345,7 +345,7 @@ HTML_CONTENT = """
         /* --- THEME: Yellow to Orange Gradient --- */
         :root {
             --bg-gradient-start: #FDB813; /* Bright Yellow */
-            --bg-gradient-end: #F99B28;   /* Warm Orange */
+            --bg-gradient-end: #F99B28;    /* Warm Orange */
             --text-dark: #333333;
             --text-light: #ffffff;
             --container-bg: rgba(255, 255, 255, 0.25);
@@ -384,6 +384,11 @@ HTML_CONTENT = """
             -webkit-background-clip: text; 
             -webkit-text-fill-color: transparent; 
         }
+        .prose a { color: #E68A1A; }
+        .prose code { color: #fff; background-color: rgba(0,0,0,0.2); }
+        .prose pre { background-color: rgba(0,0,0,0.3); border-color: rgba(255,255,255,0.1); }
+        .prose h1, .prose h2, .prose h3, .prose h4, .prose strong { color: #fff; }
+        .prose a:hover { color: #fff; }
 
         /* General UI improvements */
         .message-wrapper { animation: fadeIn 0.4s ease-out forwards; }
@@ -445,24 +450,134 @@ HTML_CONTENT = """
                 </div>
             </div>
              <div class="text-center mt-4 flex justify-center gap-4">
-               <button id="teacher-signup-link" class="text-xs text-gray-200 hover:text-white">Teacher Portal</button>
-               <button id="special-auth-link" class="text-xs text-gray-200 hover:text-white">Admin Portal</button>
+                <button id="teacher-signup-link" class="text-xs text-gray-200 hover:text-white">Teacher Portal</button>
+                <button id="special-auth-link" class="text-xs text-gray-200 hover:text-white">Admin Portal</button>
              </div>
              <p class="text-xs text-gray-100/70 mt-8">Made by DeVector</p>
         </div>
     </template>
     
-    <!-- All other templates are included but hidden for brevity -->
-    <template id="template-reset-password-page"></template>
-    <template id="template-student-signup-page"></template>
-    <template id="template-teacher-signup-page"></template>
-    <template id="template-special-auth-page"></template>
-    <template id="template-upgrade-page"></template>
-    <template id="template-admin-dashboard"></template>
-    <template id="template-teacher-dashboard"></template>
-    <template id="template-modal"></template>
-    <template id="template-welcome-screen"></template>
+    <template id="template-reset-password-page">
+        <div class="flex flex-col items-center justify-center h-full w-full p-4">
+            <div class="w-full max-w-md glassmorphism rounded-2xl p-8 shadow-2xl animate-scale-up">
+                <div class="flex justify-center mb-6" id="reset-logo-container"></div>
+                <h2 class="text-3xl font-bold text-center text-white mb-2">Reset Password</h2>
+                <p class="text-gray-200 text-center mb-8">Enter a new password for your account.</p>
+                <form id="reset-password-form">
+                    <div class="mb-4">
+                        <label for="new-password" class="block text-sm font-medium text-gray-100 mb-1">New Password</label>
+                        <input type="password" id="new-password" name="password" class="w-full p-3 bg-white/20 text-white rounded-lg border border-white/30 focus:outline-none focus:ring-2 focus:ring-yellow-300 transition-all" required>
+                    </div>
+                    <div class="mb-6">
+                        <label for="confirm-password" class="block text-sm font-medium text-gray-100 mb-1">Confirm Password</label>
+                        <input type="password" id="confirm-password" name="confirm-password" class="w-full p-3 bg-white/20 text-white rounded-lg border border-white/30 focus:outline-none focus:ring-2 focus:ring-yellow-300 transition-all" required>
+                    </div>
+                    <button type="submit" class="w-full bg-gradient-to-r from-orange-500 to-yellow-500 hover:opacity-90 text-white font-bold py-3 px-4 rounded-lg transition-opacity">Reset Password</button>
+                    <p id="reset-error" class="text-red-300 text-sm text-center h-4 mt-3"></p>
+                </form>
+            </div>
+        </div>
+    </template>
 
+    <template id="template-student-signup-page">
+        <div class="flex flex-col items-center justify-center h-full w-full p-4">
+            <div class="w-full max-w-md glassmorphism rounded-2xl p-8 shadow-2xl animate-scale-up">
+                <div class="flex justify-center mb-6" id="student-signup-logo-container"></div>
+                <h2 class="text-3xl font-bold text-center text-white mb-2">Student Account Signup</h2>
+                <p class="text-gray-200 text-center mb-8">Create your student account for Myth AI.</p>
+                <form id="student-signup-form">
+                    <div class="mb-4">
+                        <label for="student-username" class="block text-sm font-medium text-gray-100 mb-1">Username</label>
+                        <input type="text" id="student-username" name="username" class="w-full p-3 bg-white/20 text-white rounded-lg border border-white/30 focus:outline-none focus:ring-2 focus:ring-yellow-300" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="student-email" class="block text-sm font-medium text-gray-100 mb-1">Email</label>
+                        <input type="email" id="student-email" name="email" class="w-full p-3 bg-white/20 text-white rounded-lg border border-white/30 focus:outline-none focus:ring-2 focus:ring-yellow-300" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="student-password" class="block text-sm font-medium text-gray-100 mb-1">Password</label>
+                        <input type="password" id="student-password" name="password" class="w-full p-3 bg-white/20 text-white rounded-lg border border-white/30 focus:outline-none focus:ring-2 focus:ring-yellow-300" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="classroom-code" class="block text-sm font-medium text-gray-100 mb-1">Classroom Code (Optional)</label>
+                        <input type="text" id="classroom-code" name="classroom_code" class="w-full p-3 bg-white/20 text-white rounded-lg border border-white/30 focus:outline-none focus:ring-2 focus:ring-yellow-300" placeholder="Enter code from your teacher">
+                    </div>
+                    <button type="submit" class="w-full bg-gradient-to-r from-orange-500 to-yellow-500 hover:opacity-90 text-white font-bold py-3 px-4 rounded-lg">Create Student Account</button>
+                    <p id="student-signup-error" class="text-red-300 text-sm text-center h-4 mt-3"></p>
+                </form>
+                <div class="text-center mt-6">
+                    <button id="back-to-main-login" class="text-sm text-yellow-200 hover:text-white">Already have an account? Log in</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="template-teacher-signup-page">
+        <div class="flex flex-col items-center justify-center h-full w-full p-4">
+            <div class="w-full max-w-md glassmorphism rounded-2xl p-8 shadow-2xl animate-scale-up">
+                <div class="flex justify-center mb-6" id="teacher-signup-logo-container"></div>
+                <h2 class="text-3xl font-bold text-center text-white mb-2">Teacher Account Signup</h2>
+                <p class="text-gray-200 text-center mb-8">Create your teacher account.</p>
+                <form id="teacher-signup-form">
+                    <div class="mb-4">
+                        <label for="teacher-username" class="block text-sm font-medium text-gray-100 mb-1">Username</label>
+                        <input type="text" id="teacher-username" name="username" class="w-full p-3 bg-white/20 text-white rounded-lg border border-white/30 focus:outline-none focus:ring-2 focus:ring-yellow-300" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="teacher-email" class="block text-sm font-medium text-gray-100 mb-1">Email</label>
+                        <input type="email" id="teacher-email" name="email" class="w-full p-3 bg-white/20 text-white rounded-lg border border-white/30 focus:outline-none focus:ring-2 focus:ring-yellow-300" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="teacher-password" class="block text-sm font-medium text-gray-100 mb-1">Password</label>
+                        <input type="password" id="teacher-password" name="password" class="w-full p-3 bg-white/20 text-white rounded-lg border border-white/30 focus:outline-none focus:ring-2 focus:ring-yellow-300" required>
+                    </div>
+                    <div class="mb-6">
+                        <label for="teacher-secret-key" class="block text-sm font-medium text-gray-100 mb-1">Teacher Access Key</label>
+                        <input type="password" id="teacher-secret-key" name="secret_key" class="w-full p-3 bg-white/20 text-white rounded-lg border border-white/30 focus:outline-none focus:ring-2 focus:ring-yellow-300" required>
+                    </div>
+                    <button type="submit" class="w-full bg-gradient-to-r from-orange-500 to-yellow-500 hover:opacity-90 text-white font-bold py-3 px-4 rounded-lg">Create Teacher Account</button>
+                    <p id="teacher-signup-error" class="text-red-300 text-sm text-center h-4 mt-3"></p>
+                </form>
+                <div class="text-center mt-6">
+                    <button id="back-to-teacher-login" class="text-sm text-yellow-200 hover:text-white">Already have an account? Log in</button>
+                </div>
+            </div>
+        </div>
+    </template>
+    
+    <template id="template-special-auth-page">
+        <div class="flex flex-col items-center justify-center h-full w-full p-4">
+            <div class="w-full max-w-md glassmorphism rounded-2xl p-8 shadow-2xl animate-scale-up">
+                <div class="flex justify-center mb-6" id="special-auth-logo-container"></div>
+                <h2 class="text-3xl font-bold text-center text-white mb-2">Admin Signup</h2>
+                <p class="text-gray-200 text-center mb-8">Create an admin account.</p>
+                <form id="special-auth-form">
+                    <div class="mb-4">
+                        <label for="special-username" class="block text-sm font-medium text-gray-100 mb-1">Username</label>
+                        <input type="text" id="special-username" name="username" class="w-full p-3 bg-white/20 text-white rounded-lg border border-white/30 focus:outline-none focus:ring-2 focus:ring-yellow-300" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="special-email" class="block text-sm font-medium text-gray-100 mb-1">Email</label>
+                        <input type="email" id="special-email" name="email" class="w-full p-3 bg-white/20 text-white rounded-lg border border-white/30 focus:outline-none focus:ring-2 focus:ring-yellow-300" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="special-password" class="block text-sm font-medium text-gray-100 mb-1">Password</label>
+                        <input type="password" id="special-password" name="password" class="w-full p-3 bg-white/20 text-white rounded-lg border border-white/30 focus:outline-none focus:ring-2 focus:ring-yellow-300" required>
+                    </div>
+                    <div class="mb-6">
+                        <label for="secret-key" class="block text-sm font-medium text-gray-100 mb-1">Secret Key</label>
+                        <input type="password" id="secret-key" name="secret_key" class="w-full p-3 bg-white/20 text-white rounded-lg border border-white/30 focus:outline-none focus:ring-2 focus:ring-yellow-300" required>
+                    </div>
+                    <button type="submit" class="w-full bg-gradient-to-r from-orange-500 to-yellow-500 hover:opacity-90 text-white font-bold py-3 px-4 rounded-lg">Create Account</button>
+                    <p id="special-auth-error" class="text-red-300 text-sm text-center h-4 mt-3"></p>
+                </form>
+            </div>
+            <div class="text-center mt-6">
+                <button id="back-to-main-login" class="text-sm text-yellow-200 hover:text-white">Back to Main Login</button>
+            </div>
+        </div>
+    </template>
+    
     <template id="template-app-wrapper">
         <div id="main-app-layout" class="flex h-full w-full transition-colors duration-500 text-gray-800">
             <aside id="sidebar" class="bg-white/20 backdrop-blur-lg w-72 flex-shrink-0 flex flex-col p-2 h-full absolute md:relative z-20 transform transition-transform duration-300 ease-in-out -translate-x-full md:translate-x-0">
@@ -525,6 +640,93 @@ HTML_CONTENT = """
         </div>
     </template>
     
+    <template id="template-upgrade-page">
+        <div class="w-full h-full p-4 sm:p-6 md:p-8 overflow-y-auto">
+            <header class="flex justify-between items-center mb-8 text-gray-800">
+                <h1 class="text-3xl font-bold brand-gradient">Choose Your Plan</h1>
+                <button id="back-to-chat-btn" class="bg-gray-700/50 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">Back to Chat</button>
+            </header>
+            <div id="plans-container" class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto text-gray-800"></div>
+        </div>
+    </template>
+
+    <template id="template-admin-dashboard">
+        <div class="w-full h-full bg-white/20 backdrop-blur-lg p-4 sm:p-6 md:p-8 overflow-y-auto text-gray-800">
+            <header class="flex flex-wrap justify-between items-center gap-4 mb-8">
+                <div class="flex items-center gap-4">
+                    <div id="admin-logo-container"></div>
+                    <h1 class="text-3xl font-bold brand-gradient">Admin Dashboard</h1>
+                </div>
+                <div>
+                    <button id="admin-impersonate-btn" class="bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded-lg transition-colors mr-2">Impersonate User</button>
+                    <button id="admin-logout-btn" class="bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded-lg transition-colors">Logout</button>
+                </div>
+            </header>
+
+            <div class="mb-8 p-6 glassmorphism rounded-lg text-white">
+                <h2 class="text-xl font-semibold mb-4">Site Announcement</h2>
+                <form id="announcement-form" class="flex flex-col sm:flex-row gap-2">
+                    <input id="announcement-input" type="text" placeholder="Enter announcement text (leave empty to clear)" class="flex-grow p-2 bg-white/20 rounded-lg border border-white/30 text-white placeholder:text-gray-200">
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 py-2 rounded-lg">Set Banner</button>
+                </form>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 text-gray-800">
+                <div class="p-6 glassmorphism rounded-lg"><h2 class="text-white/70 text-lg">Total Users</h2><p id="admin-total-users" class="text-4xl font-bold text-white">0</p></div>
+                <div class="p-6 glassmorphism rounded-lg"><h2 class="text-white/70 text-lg">Student Users</h2><p id="admin-student-users" class="text-4xl font-bold text-white">0</p></div>
+                <div class="p-6 glassmorphism rounded-lg"><h2 class="text-white/70 text-lg">Student Pro Users</h2><p id="admin-student-pro-users" class="text-4xl font-bold text-white">0</p></div>
+            </div>
+
+            <div class="p-6 glassmorphism rounded-lg text-white">
+                <h2 class="text-xl font-semibold mb-4">User Management</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead class="border-b border-white/30">
+                            <tr>
+                                <th class="p-2">Username</th>
+                                <th class="p-2">Email</th>
+                                <th class="p-2">Role</th>
+                                <th class="p-2">Plan</th>
+                                <th class="p-2">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-user-list"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </template>
+    
+    <template id="template-teacher-dashboard">
+        <div class="w-full h-full p-4 sm:p-6 md:p-8 overflow-y-auto text-gray-800">
+            <header class="flex justify-between items-center mb-8">
+                <div class="flex items-center gap-4">
+                    <div id="teacher-logo-container"></div>
+                    <h1 class="text-3xl font-bold brand-gradient">Teacher Dashboard</h1>
+                </div>
+                <button id="teacher-logout-btn" class="bg-red-600/70 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Logout</button>
+            </header>
+            
+            <div class="max-w-6xl mx-auto space-y-8">
+                <div id="teacher-info" class="p-6 glassmorphism rounded-lg text-white"></div>
+                
+                <div id="classroom-management" class="p-6 glassmorphism rounded-lg text-white">
+                    <h2 class="text-2xl font-bold mb-4">Your Classroom</h2>
+                    <div id="classroom-details"></div>
+                    <button id="create-classroom-btn" class="mt-4 bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded-lg">Create New Classroom</button>
+                </div>
+                
+                <div id="student-chat-viewer" class="p-6 glassmorphism rounded-lg hidden">
+                    <div class="flex justify-between items-center mb-4 text-white">
+                        <h2 class="text-2xl font-bold">Student Chats: <span id="viewing-student-name"></span></h2>
+                        <button id="close-chat-viewer-btn" class="text-white/70 hover:text-white text-3xl leading-none">&times;</button>
+                    </div>
+                    <div id="student-chat-history" class="overflow-y-auto max-h-[80vh] bg-black/10 p-4 rounded-lg space-y-4 prose prose-invert max-w-none"></div>
+                </div>
+            </div>
+        </div>
+    </template>
+
     <script>
     /****************************************************************************
      * JAVASCRIPT FRONTEND LOGIC - FULLY REBUILT
@@ -534,7 +736,7 @@ HTML_CONTENT = """
             chats: {}, activeChatId: null, isAITyping: false,
             abortController: null, currentUser: null,
             uploadedFile: null,
-            teacherData: { classroom: null, students: [] },
+            teacherData: null,
             config: { google_oauth_enabled: false, email_enabled: false },
             activeAIMode: 'study_buddy'
         };
@@ -652,14 +854,12 @@ HTML_CONTENT = """
 
         function renderPage(templateId, setupFunction) {
             const template = document.getElementById(templateId);
-            if (!template || !template.content || template.content.children.length === 0) {
-                console.error(`Template with id ${templateId} not found or is empty.`);
-                // Fallback to a simple error message
+            if (!template) {
+                console.error(`Template with id ${templateId} not found.`);
                 DOMElements.appContainer.innerHTML = `<div class="text-white text-center p-8">Error: UI template "${templateId}" is missing. Please check the HTML.</div>`;
                 return;
             }
             DOMElements.appContainer.innerHTML = '';
-            // Clone the content and append it
             const content = template.content.cloneNode(true);
             DOMElements.appContainer.appendChild(content);
 
@@ -670,17 +870,17 @@ HTML_CONTENT = """
 
         function setupAuthPage() {
             renderLogo('auth-logo-container');
-            document.getElementById('auth-form').addEventListener('submit', handleLoginSubmit);
-            document.getElementById('auth-toggle-btn').addEventListener('click', () => renderPage('template-student-signup-page', setupStudentSignupPage));
-            document.getElementById('forgot-password-link').addEventListener('click', handleForgotPassword);
-            document.getElementById('teacher-signup-link').addEventListener('click', () => renderPage('template-auth-page', setupTeacherLoginPage));
-            document.getElementById('special-auth-link').addEventListener('click', () => renderPage('template-special-auth-page', setupSpecialAuthPage));
+            document.getElementById('auth-form')?.addEventListener('submit', handleLoginSubmit);
+            document.getElementById('auth-toggle-btn')?.addEventListener('click', () => renderPage('template-student-signup-page', setupStudentSignupPage));
+            document.getElementById('forgot-password-link')?.addEventListener('click', handleForgotPassword);
+            document.getElementById('teacher-signup-link')?.addEventListener('click', () => renderPage('template-auth-page', setupTeacherLoginPage));
+            document.getElementById('special-auth-link')?.addEventListener('click', () => renderPage('template-special-auth-page', setupSpecialAuthPage));
         }
         
         function setupStudentSignupPage() {
             renderLogo('student-signup-logo-container');
-            document.getElementById('student-signup-form').addEventListener('submit', handleStudentSignupSubmit);
-            document.getElementById('back-to-main-login').addEventListener('click', () => renderPage('template-auth-page', setupAuthPage));
+            document.getElementById('student-signup-form')?.addEventListener('submit', handleStudentSignupSubmit);
+            document.getElementById('back-to-main-login')?.addEventListener('click', () => renderPage('template-auth-page', setupAuthPage));
         }
         
         function setupTeacherLoginPage() {
@@ -688,11 +888,52 @@ HTML_CONTENT = """
                 renderLogo('auth-logo-container');
                 document.getElementById('auth-title').textContent = "Teacher Portal";
                 document.getElementById('auth-subtitle').textContent = "Sign in to your teacher account.";
-                document.getElementById('auth-form').addEventListener('submit', handleLoginSubmit);
+                document.getElementById('auth-form')?.addEventListener('submit', handleLoginSubmit);
                 const toggleBtn = document.getElementById('auth-toggle-btn');
                 toggleBtn.textContent = "Don't have a teacher account? Sign Up";
                 toggleBtn.onclick = () => renderPage('template-teacher-signup-page', setupTeacherSignupPage);
             });
+        }
+        
+        function setupTeacherSignupPage() {
+            renderLogo('teacher-signup-logo-container');
+            document.getElementById('teacher-signup-form')?.addEventListener('submit', handleTeacherSignupSubmit);
+            document.getElementById('back-to-teacher-login')?.addEventListener('click', () => renderPage('template-auth-page', setupTeacherLoginPage));
+        }
+        
+        function setupSpecialAuthPage() {
+            renderLogo('special-auth-logo-container');
+            document.getElementById('special-auth-form')?.addEventListener('submit', handleSpecialAuthSubmit);
+            document.getElementById('back-to-main-login')?.addEventListener('click', () => renderPage('template-auth-page', setupAuthPage));
+        }
+        
+        function setupResetPasswordPage(token) {
+            renderLogo('reset-logo-container');
+            document.getElementById('reset-password-form')?.addEventListener('submit', (e) => handleResetPasswordSubmit(e, token));
+        }
+        
+        function setupAdminDashboard() {
+            renderLogo('admin-logo-container');
+            fetchAdminData();
+            document.getElementById('admin-logout-btn')?.addEventListener('click', handleLogout);
+            document.getElementById('admin-impersonate-btn')?.addEventListener('click', handleImpersonate);
+            document.getElementById('announcement-form')?.addEventListener('submit', handleSetAnnouncement);
+            document.getElementById('admin-user-list')?.addEventListener('click', (e) => {
+                const target = e.target.closest('.delete-user-btn');
+                if (target) {
+                    handleAdminDeleteUser(target.dataset.userid);
+                }
+            });
+        }
+        
+        async function setupTeacherDashboard() {
+            renderLogo('teacher-logo-container');
+            document.getElementById('teacher-logout-btn')?.addEventListener('click', handleLogout);
+            const data = await apiCall('/api/teacher/dashboard_data');
+            if (data.success) {
+                appState.teacherData = data.classroom;
+                updateTeacherDashboardUI(data.classroom, data.students);
+            }
         }
         
         function setupAppUI() {
@@ -707,27 +948,6 @@ HTML_CONTENT = """
             renderJoinClassroom();
             renderAIModeSelector();
             fetchStudentLeaderboard();
-        }
-
-        function setupAppEventListeners() {
-            document.getElementById('new-chat-btn')?.addEventListener('click', () => createNewChat(true));
-            document.getElementById('logout-btn')?.addEventListener('click', handleLogout);
-            document.getElementById('send-btn')?.addEventListener('click', handleSendMessage);
-            
-            const userInput = document.getElementById('user-input');
-            if (userInput) {
-                userInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } });
-                userInput.addEventListener('input', () => { userInput.style.height = 'auto'; userInput.style.height = `${userInput.scrollHeight}px`; });
-            }
-            
-            document.getElementById('menu-toggle-btn')?.addEventListener('click', () => {
-                document.getElementById('sidebar')?.classList.toggle('-translate-x-full');
-                document.getElementById('sidebar-backdrop')?.classList.toggle('hidden');
-            });
-             document.getElementById('sidebar-backdrop')?.addEventListener('click', () => {
-                document.getElementById('sidebar')?.classList.add('-translate-x-full');
-                document.getElementById('sidebar-backdrop')?.classList.add('hidden');
-            });
         }
 
         // --- Event Handlers ---
@@ -745,7 +965,7 @@ HTML_CONTENT = """
                 errorEl.textContent = result.error;
             }
         }
-
+        
         async function handleStudentSignupSubmit(e) {
             e.preventDefault();
             const form = e.target;
@@ -760,120 +980,210 @@ HTML_CONTENT = """
                 errorEl.textContent = result.error;
             }
         }
-        
-        // --- App Logic ---
-        async function handleSendMessage(){
-            const userInput = document.getElementById('user-input');
-            if (!userInput) return;
-            if (appState.currentUser.account_type === 'student' && !appState.currentUser.classroom_code) {
-                showToast("You must join a classroom before you can send messages.", "error");
-                handleJoinClassroom();
-                return;
-            }
-            const prompt = userInput.value.trim();
-            if ((!prompt && !appState.uploadedFile) || appState.isAITyping) return;
-            
-            appState.isAITyping = true;
-            appState.abortController = new AbortController();
-            updateUIState();
-            let aiContentEl;
-            
-            try {
-                if (!appState.activeChatId) {
-                    if (!await createNewChat(false)) throw new Error("Could not start chat.");
-                }
-                if (appState.chats[appState.activeChatId]?.messages.length === 0) {
-                    document.getElementById('message-list').innerHTML = '';
-                }
-                addMessageToDOM({ sender: 'user', content: prompt });
-                aiContentEl = addMessageToDOM({ sender: 'model', content: '' }, true).querySelector('.message-content');
-                userInput.value = '';
-                userInput.style.height = 'auto';
-                const formData = new FormData();
-                formData.append('chat_id', appState.activeChatId);
-                formData.append('prompt', prompt);
-                formData.append('ai_mode', appState.activeAIMode);
-                if (appState.uploadedFile) {
-                    formData.append('file', appState.uploadedFile);
-                    appState.uploadedFile = null;
-                    updatePreviewContainer();
-                }
-                const response = await fetch('/api/chat', { method: 'POST', body: formData, signal: appState.abortController.signal });
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || `Server error: ${response.status}`);
-                }
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let fullResponse = '';
-                const chatWindow = document.getElementById('chat-window');
-                while (true) {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-                    let chunk = decoder.decode(value, { stream: true });
-                    if (chunk.startsWith('STREAM_ERROR:')) {
-                        throw new Error(chunk.replace('STREAM_ERROR:', '').trim());
-                    }
-                    fullResponse += chunk;
-                    aiContentEl.innerHTML = DOMPurify.sanitize(marked.parse(fullResponse + '<span class="animate-pulse">▍</span>'));
-                    if(chatWindow) chatWindow.scrollTop = chatWindow.scrollHeight;
-                }
-                aiContentEl.innerHTML = DOMPurify.sanitize(marked.parse(fullResponse || "Empty response."));
-                renderCodeCopyButtons();
-                const updatedData = await apiCall('/api/status');
-                if (updatedData.success) {
-                    appState.currentUser = updatedData.user;
-                    appState.chats = updatedData.chats;
-                    renderChatHistoryList();
-                    updateUserInfo();
-                    document.getElementById('chat-title').textContent = appState.chats[appState.activeChatId].title;
-                }
-            } catch (err) {
-                if (err.name === 'AbortError') {
-                    if(aiContentEl) aiContentEl.innerHTML += "<p class='text-sm text-red-400 mt-2'>[Generation stopped by user]</p>";
-                } else {
-                    showToast(err.message, 'error');
-                    if(aiContentEl) aiContentEl.innerHTML = `<p class='text-red-400'>Error: ${err.message}</p>`;
-                }
-            } finally {
-                appState.isAITyping = false;
-                appState.abortController = null;
-                updateUIState();
+
+        async function handleTeacherSignupSubmit(e) {
+            e.preventDefault();
+            const form = e.target;
+            const errorEl = document.getElementById('teacher-signup-error');
+            errorEl.textContent = '';
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+            const result = await apiCall('/api/teacher_signup', { method: 'POST', body: JSON.stringify(data) });
+            if (result.success) {
+                initializeApp(result.user, result.chats, result.settings, result.config);
+            } else {
+                errorEl.textContent = result.error;
             }
         }
         
-        // --- Re-implementing ALL missing functions from the original JS ---
+        async function handleSpecialAuthSubmit(e) {
+            e.preventDefault();
+            const form = e.target;
+            const errorEl = document.getElementById('special-auth-error');
+            errorEl.textContent = '';
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+            const result = await apiCall('/api/special_signup', { method: 'POST', body: JSON.stringify(data) });
+            if (result.success) {
+                initializeApp(result.user, {}, result.settings, result.config);
+            } else {
+                errorEl.textContent = result.error;
+            }
+        }
+        
+        async function handleForgotPassword() {
+            const email = prompt("Please enter your email to reset your password:");
+            if (email) {
+                const result = await apiCall('/api/request-password-reset', { method: 'POST', body: JSON.stringify({ email }) });
+                if (result.success) {
+                    showToast(result.message, 'info');
+                }
+            }
+        }
+        
+        async function handleResetPasswordSubmit(e, token) {
+            e.preventDefault();
+            const form = e.target;
+            const errorEl = document.getElementById('reset-error');
+            errorEl.textContent = '';
+            const newPassword = form['new-password'].value;
+            const confirmPassword = form['confirm-password'].value;
+            if (newPassword !== confirmPassword) {
+                errorEl.textContent = "Passwords do not match.";
+                return;
+            }
+            const result = await apiCall('/api/reset-with-token', { method: 'POST', body: JSON.stringify({ token, password: newPassword }) });
+            if (result.success) {
+                showToast(result.message, 'success');
+                setTimeout(() => window.location.href = '/', 2000);
+            } else {
+                errorEl.textContent = result.error;
+            }
+        }
+        
+        // --- App UI Functions ---
+        function renderChatHistoryList() {
+            const listEl = document.getElementById('chat-history-list');
+            if (!listEl) return;
+            listEl.innerHTML = '';
+            Object.values(appState.chats)
+                .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+                .forEach(chat => {
+                    const itemWrapper = document.createElement('div');
+                    itemWrapper.className = `w-full flex items-center justify-between p-3 rounded-lg hover:bg-black/10 transition-colors duration-200 group ${chat.id === appState.activeChatId ? 'bg-black/20' : ''}`;
+                    const chatButton = document.createElement('button');
+                    chatButton.className = 'flex-grow text-left truncate text-sm font-semibold text-white';
+                    chatButton.textContent = chat.title;
+                    chatButton.onclick = () => {
+                        appState.activeChatId = chat.id;
+                        renderActiveChat();
+                        renderChatHistoryList();
+                        const menuToggleBtn = document.getElementById('menu-toggle-btn');
+                        if (menuToggleBtn && menuToggleBtn.offsetParent !== null) {
+                            document.getElementById('sidebar')?.classList.add('-translate-x-full');
+                            document.getElementById('sidebar-backdrop')?.classList.add('hidden');
+                        }
+                    };
+                    itemWrapper.appendChild(chatButton);
+                    listEl.appendChild(itemWrapper);
+                });
+        }
+
+        function renderActiveChat() {
+            const messageList = document.getElementById('message-list');
+            const chatTitle = document.getElementById('chat-title');
+            if (!messageList || !chatTitle) return;
+            messageList.innerHTML = '';
+            appState.uploadedFile = null;
+            updatePreviewContainer();
+            const chat = appState.chats[appState.activeChatId];
+            if (chat && chat.messages && chat.messages.length > 0) {
+                chatTitle.textContent = chat.title;
+                chat.messages.forEach(msg => addMessageToDOM(msg));
+                renderCodeCopyButtons();
+            } else {
+                chatTitle.textContent = 'New Chat';
+                renderWelcomeScreen();
+            }
+            updateUIState();
+        }
+
+        function renderWelcomeScreen() {
+            const messageList = document.getElementById('message-list');
+            if (!messageList) return;
+            const template = document.getElementById('template-welcome-screen');
+            messageList.innerHTML = '';
+            messageList.appendChild(template.content.cloneNode(true));
+            renderLogo('welcome-logo-container');
+            document.getElementById('welcome-title').textContent = `Welcome to Myth AI`;
+            document.getElementById('welcome-subtitle').textContent = `Start a new conversation or select one from the sidebar. How can I help you today?`;
+        }
+
+        function updateUserInfo() {
+            const userInfoDiv = document.getElementById('user-info');
+            if (!userInfoDiv || !appState.currentUser) return;
+            const { username, plan, account_type, daily_messages, message_limit, streak } = appState.currentUser;
+            const planDetails = PLAN_CONFIG[plan] || PLAN_CONFIG['student'];
+            const planName = planDetails.name;
+            const avatarChar = username[0].toUpperCase();
+            const avatarColor = `hsl(${username.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % 360}, 70%, 50%)`;
+            
+            userInfoDiv.innerHTML = `
+                <div class="flex items-center gap-3 text-white">
+                    <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-bold text-white" style="background-color: ${avatarColor};">
+                        ${avatarChar}
+                    </div>
+                    <div>
+                        <div class="font-semibold">${username}</div>
+                        <div class="text-xs text-white/70">${planName} (${account_type.charAt(0).toUpperCase() + account_type.slice(1)})</div>
+                    </div>
+                </div>`;
+            const limitDisplay = document.getElementById('message-limit-display');
+            if(limitDisplay) limitDisplay.textContent = `Daily Messages: ${daily_messages} / ${message_limit} | Streak: ${streak} days`;
+        }
+        
+        async function handleJoinClassroom() {
+            const code = prompt("Enter your classroom code:");
+            if (code) {
+                const result = await apiCall('/api/student/join_classroom', { method: 'POST', body: JSON.stringify({ classroom_code: code }) });
+                if (result.success) {
+                    appState.currentUser.classroom_code = result.user.classroom_code;
+                    showToast("Joined classroom successfully!", "success");
+                    renderJoinClassroom();
+                    fetchStudentLeaderboard();
+                    updateUserInfo();
+                } else {
+                    showToast(result.error, "error");
+                }
+            }
+        }
+        
+        function updatePreviewContainer() {
+            const previewContainer = document.getElementById('preview-container');
+            if (!previewContainer) return;
+            if (appState.uploadedFile) {
+                previewContainer.classList.remove('hidden');
+                const objectURL = URL.createObjectURL(appState.uploadedFile);
+                previewContainer.innerHTML = `<div class="relative inline-block"><img src="${objectURL}" alt="Image preview" class="h-16 w-16 object-cover rounded-md"><button id="remove-preview-btn" class="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">&times;</button></div>`;
+                document.getElementById('remove-preview-btn').onclick = () => {
+                    appState.uploadedFile = null;
+                    document.getElementById('file-input').value = '';
+                    updatePreviewContainer();
+                };
+            } else {
+                previewContainer.classList.add('hidden');
+                previewContainer.innerHTML = '';
+            }
+        }
+        
         function renderAIModeSelector() {
             const container = document.getElementById('ai-mode-selector-container');
-            if (!container || appState.currentUser.account_type !== 'student') return;
+            if (!container || appState.currentUser.account_type !== 'student') {
+                if (container) container.innerHTML = '';
+                return;
+            }
+            
+            const planDetails = PLAN_CONFIG[appState.currentUser.plan];
+            const allModes = {
+                'study_buddy': 'Study Buddy',
+                'quiz_master': 'Quiz Master',
+                'practice_partner': 'Practice Partner',
+                'test_proctor': 'Test Proctor'
+            };
+            const availableModes = planDetails.can_upload ? allModes : {'study_buddy': 'Study Buddy'};
+            
             container.innerHTML = `
                 <select id="ai-mode-selector" class="bg-black/20 border border-white/30 text-white text-sm rounded-lg focus:ring-yellow-400 focus:border-yellow-400 block p-2">
-                    <option value="study_buddy">Study Buddy</option>
-                    <option value="quiz_master">Quiz Master</option>
-                    <option value="practice_partner">Practice Partner</option>
-                    <option value="test_proctor">Test Proctor</option>
+                    ${Object.entries(availableModes).map(([key, value]) => 
+                        `<option value="${key}" ${key === appState.activeAIMode ? 'selected' : ''}>${value}</option>`
+                    ).join('')}
                 </select>
             `;
             const selector = document.getElementById('ai-mode-selector');
-            selector.value = appState.activeAIMode;
             selector.addEventListener('change', (e) => {
                 appState.activeAIMode = e.target.value;
+                document.getElementById('user-input').placeholder = `Message ${e.target.selectedOptions[0].text}...`;
             });
-        }
-
-        async function fetchStudentLeaderboard(){
-            const leaderboardContainer = document.getElementById('student-leaderboard-container');
-            if (!leaderboardContainer || appState.currentUser.account_type !== 'student' || !appState.currentUser.classroom_code) return;
-            const result = await apiCall('/api/student/leaderboard');
-            if (result.success && result.leaderboard.length > 0) {
-                leaderboardContainer.classList.remove('hidden');
-                let html = `<div class="max-w-4xl mx-auto mb-4 p-4 glassmorphism rounded-lg text-white"><h3 class="text-lg font-bold mb-2 text-yellow-300">Class Leaderboard</h3>`;
-                html += `<ul class="space-y-1">${result.leaderboard.map((s, i) => `<li class="flex justify-between items-center text-sm"><span class="truncate"><strong>${i + 1}.</strong> ${s.username}</span><span class="font-mono text-yellow-300">${s.streak} days</span></li>`).join('')}</ul></div>`;
-                leaderboardContainer.innerHTML = html;
-            } else {
-                leaderboardContainer.innerHTML = '';
-                leaderboardContainer.classList.add('hidden');
-            }
         }
         
         function renderJoinClassroom() {
@@ -883,73 +1193,306 @@ HTML_CONTENT = """
                 return;
             }
             container.innerHTML = `<button id="join-classroom-btn" class="w-full text-left flex items-center gap-3 p-3 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors duration-200"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg> Join Classroom</button>`;
-            document.getElementById('join-classroom-btn').addEventListener('click', handleJoinClassroom);
+            document.getElementById('join-classroom-btn')?.addEventListener('click', handleJoinClassroom);
         }
 
-        // --- All other helper functions from your original code need to be included here ---
-        // I am adding them back in below.
-        
-        function updateUIState(){
-            const sendBtn = document.getElementById('send-btn');
-            if (sendBtn) sendBtn.disabled = appState.isAITyping;
-            const stopContainer = document.getElementById('stop-generating-container');
-            if (stopContainer) stopContainer.style.display = appState.isAITyping ? 'block' : 'none';
-        }
-
-        function updatePreviewContainer() { /* Your existing code */ }
-
-        function addMessageToDOM(msg, isStreaming = false){
-            const messageList = document.getElementById('message-list');
-            const chatWindow = document.getElementById('chat-window');
-            if (!messageList || !chatWindow || !appState.currentUser) return null;
-            const wrapper = document.createElement('div');
-            wrapper.className = 'message-wrapper flex items-start gap-4';
-            const senderIsAI = msg.sender === 'model';
-            const avatarChar = senderIsAI ? 'AI' : appState.currentUser.username[0].toUpperCase();
-            const userAvatarColor = `background-color: hsl(${appState.currentUser.username.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % 360}, 70%, 50%)`;
-            const aiAvatarHTML = `<div class="ai-avatar flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-white bg-gray-600">${avatarChar}</div>`;
-            const userAvatarHTML = `<div class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-white" style="${userAvatarColor}">${avatarChar}</div>`;
-            const messageContentHTML = isStreaming 
-                ? '<div class="typing-indicator"><span></span><span></span><span></span></div>' 
-                : DOMPurify.sanitize(marked.parse(msg.content || ""));
-            wrapper.innerHTML = `${senderIsAI ? aiAvatarHTML : userAvatarHTML}<div class="flex-1 min-w-0"><div class="font-bold text-white">${senderIsAI ? 'Study Buddy' : 'You'}</div><div class="prose prose-invert max-w-none message-content text-white">${messageContentHTML}</div></div>`;
-            messageList.appendChild(wrapper);
-            chatWindow.scrollTop = chatWindow.scrollHeight;
-            return wrapper;
-        }
-
-        async function createNewChat(shouldRender = true){
-            const result = await apiCall('/api/chat/new', { method: 'POST' });
+        async function handleCreateClassroom() {
+            const result = await apiCall('/api/teacher/generate_classroom_code', { method: 'POST' });
             if (result.success) {
-                appState.chats[result.chat.id] = result.chat;
-                appState.activeChatId = result.chat.id;
-                if (shouldRender) {
-                    renderActiveChat();
-                    renderChatHistoryList();
-                }
-                return true;
+                showToast(`Classroom created with code: ${result.code}`, "success");
+                setupTeacherDashboard();
+            } else {
+                showToast(result.error, "error");
             }
-            return false;
         }
         
-        function renderCodeCopyButtons(){}
-        async function handleLogout(doApiCall = true){
-            if(doApiCall) await apiCall('/api/logout');
-            window.location.reload();
-        }
-        function handleRenameChat(){}
-        function handleDeleteChat(){}
-        function handleShareChat(){}
-        function handleDownloadChat(){}
-        function renderUpgradePage(){}
-        function handleForgotPassword(){}
-        function setupTeacherSignupPage(){}
-        function setupSpecialAuthPage(){}
-        function setupResetPasswordPage(){}
-        function setupAdminDashboard(){}
-        function setupTeacherDashboard(){}
+        async function updateTeacherDashboardUI(classroom, students) {
+            const classroomDetailsEl = document.getElementById('classroom-details');
+            if (!classroomDetailsEl) return;
 
-        // --- INITIAL LOAD ---
+            if (classroom.code) {
+                classroomDetailsEl.innerHTML = `
+                    <div class="space-y-4">
+                        <p class="text-xl">Your Classroom Code: <span class="font-mono text-yellow-300">${classroom.code}</span></p>
+                        <h3 class="text-lg font-bold">Students (${students.length}):</h3>
+                        <ul id="teacher-student-list" class="space-y-2"></ul>
+                    </div>
+                `;
+                const studentListEl = document.getElementById('teacher-student-list');
+                students.forEach(student => {
+                    const studentItem = document.createElement('li');
+                    studentItem.className = 'flex items-center justify-between p-2 bg-black/10 rounded-lg';
+                    studentItem.innerHTML = `
+                        <div class="flex items-center gap-2">
+                            <span>${student.username} (Streak: ${student.streak})</span>
+                            <button class="bg-gray-700/50 hover:bg-gray-700 text-white text-xs px-2 py-1 rounded-full view-chats-btn" data-studentid="${student.id}">View Chats</button>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button class="bg-yellow-600/50 hover:bg-yellow-600 text-white text-xs px-2 py-1 rounded-full extend-limit-btn" data-studentid="${student.id}">Extend Limit</button>
+                            <button class="bg-red-600/50 hover:bg-red-600 text-white text-xs px-2 py-1 rounded-full kick-student-btn" data-studentid="${student.id}">Kick</button>
+                        </div>
+                    `;
+                    studentListEl.appendChild(studentItem);
+                });
+
+                document.getElementById('create-classroom-btn').style.display = 'none';
+                classroomDetailsEl.addEventListener('click', async (e) => {
+                    const target = e.target.closest('button');
+                    if (!target) return;
+                    if (target.classList.contains('view-chats-btn')) {
+                        handleViewStudentChats(target.dataset.studentid);
+                    } else if (target.classList.contains('kick-student-btn')) {
+                        handleKickStudent(target.dataset.studentid);
+                    } else if (target.classList.contains('extend-limit-btn')) {
+                        handleExtendLimit(target.dataset.studentid);
+                    }
+                });
+
+            } else {
+                classroomDetailsEl.innerHTML = `<p class="text-white/70">You don't have a classroom yet. Click the button below to create one.</p>`;
+                document.getElementById('create-classroom-btn').style.display = 'block';
+                document.getElementById('create-classroom-btn').addEventListener('click', handleCreateClassroom);
+            }
+        }
+
+        async function handleViewStudentChats(studentId) {
+            const result = await apiCall(`/api/teacher/student_chats/${studentId}`);
+            if (result.success) {
+                const studentName = (await apiCall('/api/admin_data')).users.find(u => u.id === studentId)?.username || 'Student';
+                const chatViewerEl = document.getElementById('student-chat-viewer');
+                const chatHistoryEl = document.getElementById('student-chat-history');
+                chatViewerEl.classList.remove('hidden');
+                document.getElementById('viewing-student-name').textContent = studentName;
+                chatHistoryEl.innerHTML = '';
+                result.chats.forEach(chat => {
+                    const chatEl = document.createElement('div');
+                    chatEl.className = 'p-4 bg-black/20 rounded-lg';
+                    chatEl.innerHTML = `<h5 class="font-semibold text-sm mb-2 text-yellow-300">${chat.title}</h5>`;
+                    chat.messages.forEach(msg => {
+                        const msgEl = document.createElement('div');
+                        msgEl.className = `text-sm text-white prose-invert`;
+                        const sender = msg.sender === 'user' ? 'Student' : 'Myth AI';
+                        msgEl.innerHTML = `<strong>${sender}:</strong> ${escapeHTML(msg.content)}`;
+                        chatEl.appendChild(msgEl);
+                    });
+                    chatHistoryEl.appendChild(chatEl);
+                });
+                document.getElementById('close-chat-viewer-btn').addEventListener('click', () => chatViewerEl.classList.add('hidden'));
+            }
+        }
+        
+        async function handleKickStudent(studentId) {
+            if (confirm("Are you sure you want to kick this student? This will remove them from the classroom.")) {
+                const result = await apiCall('/api/teacher/kick_student', { method: 'POST', body: JSON.stringify({ student_id: studentId }) });
+                if (result.success) {
+                    showToast(result.message, "success");
+                    setupTeacherDashboard();
+                } else {
+                    showToast(result.error, "error");
+                }
+            }
+        }
+
+        async function handleExtendLimit(studentId) {
+            const newLimit = prompt("Enter the new message limit for this student for today:");
+            if (newLimit && !isNaN(parseInt(newLimit))) {
+                const result = await apiCall('/api/teacher/extend_limit', { method: 'POST', body: JSON.stringify({ student_id: studentId, new_limit: parseInt(newLimit) }) });
+                if (result.success) {
+                    showToast(result.message, "success");
+                    setupTeacherDashboard();
+                } else {
+                    showToast(result.error, "error");
+                }
+            }
+        }
+
+        async function fetchStudentLeaderboard() {
+            const leaderboardContainer = document.getElementById('student-leaderboard-container');
+            if (!leaderboardContainer || appState.currentUser.account_type !== 'student' || !appState.currentUser.classroom_code) {
+                if (leaderboardContainer) leaderboardContainer.innerHTML = '';
+                return;
+            }
+            const result = await apiCall('/api/student/leaderboard');
+            if (result.success && result.leaderboard.length > 0) {
+                leaderboardContainer.classList.remove('hidden');
+                let html = `<div class="mx-auto max-w-3xl mb-4 p-4 glassmorphism rounded-lg text-white"><h3 class="text-lg font-bold mb-2 text-yellow-300">Class Leaderboard</h3>`;
+                html += `<ul class="space-y-1">${result.leaderboard.map((s, i) => `<li class="flex justify-between items-center text-sm"><span class="truncate"><strong>${i + 1}.</strong> ${s.username}</span><span class="font-mono text-yellow-300">${s.streak} days</span></li>`).join('')}</ul></div>`;
+                leaderboardContainer.innerHTML = html;
+            } else {
+                leaderboardContainer.innerHTML = '';
+                leaderboardContainer.classList.add('hidden');
+            }
+        }
+        
+        async function fetchAdminData() {
+            const data = await apiCall('/api/admin_data');
+            if (!data.success) return;
+            document.getElementById('admin-total-users').textContent = data.stats.total_users;
+            document.getElementById('admin-student-users').textContent = data.stats.student_users;
+            document.getElementById('admin-student-pro-users').textContent = data.stats.student_pro_users;
+            document.getElementById('announcement-input').value = data.announcement;
+            const userList = document.getElementById('admin-user-list');
+            userList.innerHTML = '';
+            data.users.forEach(user => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-white/30 text-white/80';
+                tr.innerHTML = `<td class="p-2">${user.username}</td><td class="p-2">${user.email}</td><td class="p-2">${user.role}</td><td class="p-2">${user.plan}</td><td class="p-2"><button data-userid="${user.id}" class="delete-user-btn text-xs px-2 py-1 rounded bg-red-600/70 hover:bg-red-600">Delete</button></td>`;
+                userList.appendChild(tr);
+            });
+        }
+        
+        async function handleSetAnnouncement(e) {
+            e.preventDefault();
+            const text = document.getElementById('announcement-input').value;
+            const result = await apiCall('/api/admin/announcement', { method: 'POST', body: JSON.stringify({ text }) });
+            if (result.success) {
+                showToast(result.message, 'success');
+                DOMElements.announcementBanner.textContent = text;
+                DOMElements.announcementBanner.classList.toggle('hidden', !text);
+            }
+        }
+        
+        async function handleAdminDeleteUser(userId) {
+            if (confirm(`Are you sure you want to delete user ${userId}? This is irreversible.`)) {
+                const result = await apiCall('/api/admin/delete_user', { method: 'POST', body: JSON.stringify({ user_id: userId }) });
+                if (result.success) {
+                    showToast(result.message, 'success');
+                    fetchAdminData();
+                }
+            }
+        }
+
+        async function handleImpersonate() {
+            const username = prompt("Enter the username of the user to impersonate:");
+            if (username) {
+                const result = await apiCall('/api/admin/impersonate', { method: 'POST', body: JSON.stringify({ username }) });
+                if (result.success) {
+                    showToast(`Now impersonating ${username}. You will be logged in as them.`, 'success');
+                    setTimeout(() => window.location.reload(), 1500);
+                }
+            }
+        }
+
+        async function handleLogout(doApiCall = true) {
+            if (doApiCall) await apiCall('/api/logout');
+            window.location.href = '/';
+        }
+
+        async function handleRenameChat() {
+            if (!appState.activeChatId) return;
+            const oldTitle = appState.chats[appState.activeChatId]?.title;
+            const newTitle = prompt("Enter a new name for this chat:", oldTitle);
+            if (newTitle && newTitle.trim() !== oldTitle) {
+                const result = await apiCall('/api/chat/rename', { method: 'POST', body: JSON.stringify({ chat_id: appState.activeChatId, title: newTitle.trim() }) });
+                if (result.success) {
+                    appState.chats[appState.activeChatId].title = newTitle.trim();
+                    renderChatHistoryList();
+                    document.getElementById('chat-title').textContent = newTitle.trim();
+                    showToast("Chat renamed!", "success");
+                }
+            }
+        }
+
+        async function handleDeleteChat() {
+            if (!appState.activeChatId) return;
+            if (confirm("Are you sure you want to delete this chat? This action cannot be undone.")) {
+                const result = await apiCall('/api/chat/delete', { method: 'POST', body: JSON.stringify({ chat_id: appState.activeChatId }) });
+                if (result.success) {
+                    delete appState.chats[appState.activeChatId];
+                    const sortedChatIds = Object.keys(appState.chats).sort((a, b) => (appState.chats[b].created_at || '').localeCompare(appState.chats[a].created_at || ''));
+                    appState.activeChatId = sortedChatIds.length > 0 ? sortedChatIds[0] : null;
+                    renderChatHistoryList();
+                    renderActiveChat();
+                    showToast("Chat deleted.", "success");
+                }
+            }
+        }
+        
+        async function handleShareChat() {
+            if (!appState.activeChatId) return;
+            const result = await apiCall('/api/chat/share', { method: 'POST', body: JSON.stringify({ chat_id: appState.activeChatId }) });
+            if (result.success) {
+                const shareUrl = `${window.location.origin}/share/${result.share_id}`;
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'w-full p-2 bg-gray-700/50 rounded-lg border border-gray-600';
+                input.value = shareUrl;
+                input.readOnly = true;
+                openModal('Shareable Link', input, () => {
+                    navigator.clipboard.writeText(shareUrl);
+                    showToast('Link copied to clipboard!', 'success');
+                }, 'Copy Link');
+            }
+        }
+        
+        function handleDownloadChat() {
+            if (!appState.activeChatId || !appState.chats[appState.activeChatId]) return;
+            const chat = appState.chats[appState.activeChatId];
+            const content = chat.messages.map(msg => `${msg.sender === 'user' ? 'You' : 'Myth AI'}: ${msg.content}`).join('\n\n');
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${chat.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast("Chat downloaded!", "success");
+        }
+        
+        function handleUpgradePlanClick() {
+            renderPage('template-upgrade-page', setupUpgradePage);
+        }
+        
+        async function handlePurchase(planId) {
+            try {
+                const sessionResult = await apiCall('/api/create-checkout-session', { method: 'POST', body: JSON.stringify({ plan_id: planId }) });
+                if (!sessionResult.success) throw new Error(sessionResult.error || "Could not create payment session.");
+                const stripe = Stripe(SITE_CONFIG["STRIPE_PUBLIC_KEY"]);
+                const { error } = await stripe.redirectToCheckout({ sessionId: sessionResult.id });
+                if (error) showToast(error.message, 'error');
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function setupUpgradePage() {
+            const plansContainer = document.getElementById('plans-container');
+            if (!plansContainer) return;
+            const plansResult = await apiCall('/api/plans');
+            if (!plansResult.success) { plansContainer.innerHTML = `<p class="text-red-400">Could not load plans.</p>`; return; }
+            const { plans, user_plan } = plansResult;
+            plansContainer.innerHTML = '';
+            const planOrder = ['student', 'student_pro'];
+            planOrder.forEach(planId => {
+                const plan = plans[planId];
+                if (!plan) return;
+                const isCurrentPlan = planId === user_plan;
+                const card = document.createElement('div');
+                card.className = `p-8 glassmorphism rounded-lg border-2 ${isCurrentPlan ? 'border-orange-500' : 'border-white/30'}`;
+                card.innerHTML = `<h2 class="text-2xl font-bold text-center ${plan.color}">${plan.name}</h2><p class="text-4xl font-bold text-center my-4 text-white">${plan.price_string}</p><ul class="space-y-2 text-white/80 mb-6">${plan.features.map(f => `<li>✓ ${f}</li>`).join('')}</ul><button ${isCurrentPlan ? 'disabled' : ''} data-planid="${planId}" class="purchase-btn w-full mt-6 font-bold py-3 px-4 rounded-lg transition-opacity ${isCurrentPlan ? 'bg-gray-600/70 cursor-not-allowed' : 'bg-gradient-to-r from-orange-500 to-yellow-500 hover:opacity-90'}">${isCurrentPlan ? 'Current Plan' : 'Upgrade'}</button>`;
+                plansContainer.appendChild(card);
+            });
+            document.getElementById('back-to-chat-btn')?.addEventListener('click', () => renderPage('template-app-wrapper', setupAppUI));
+            plansContainer.addEventListener('click', (e) => {
+                const target = e.target.closest('.purchase-btn');
+                if (target && !target.disabled) handlePurchase(target.dataset.planid);
+            });
+        }
+        
+        // --- FINAL SETUP ---
+        document.getElementById('upgrade-plan-btn')?.addEventListener('click', handleUpgradePlanClick);
+        document.getElementById('delete-chat-btn')?.addEventListener('click', handleDeleteChat);
+        document.getElementById('rename-chat-btn')?.addEventListener('click', handleRenameChat);
+        document.getElementById('share-chat-btn')?.addEventListener('click', handleShareChat);
+        document.getElementById('download-chat-btn')?.addEventListener('click', handleDownloadChat);
+        document.getElementById('upload-btn')?.addEventListener('click', () => document.getElementById('file-input')?.click());
+        document.getElementById('file-input')?.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) { appState.uploadedFile = e.target.files[0]; updatePreviewContainer(); }
+        });
+        document.getElementById('stop-generating-btn')?.addEventListener('click', () => { if (appState.abortController) appState.abortController.abort(); });
+        
         routeHandler();
     });
     </script>
@@ -1183,13 +1726,12 @@ def status():
 @rate_limited()
 def special_signup():
     data = request.get_json()
-    username, password, secret_key = data.get('username'), data.get('password'), data.get('secret_key')
+    username, password, email, secret_key = data.get('username'), data.get('password'), data.get('email', '').strip().lower(), data.get('secret_key')
     if secret_key != SITE_CONFIG["SECRET_REGISTRATION_KEY"]: return jsonify({"error": "Invalid secret key."}), 403
-    if not all([username, password]): return jsonify({"error": "Username and password are required."}), 400
+    if not all([username, password, email]): return jsonify({"error": "Username, email and password are required."}), 400
     if User.get_by_username(username): return jsonify({"error": "Username already exists."}), 409
     
-    admin_email = f"{username}@example.com"
-    new_user = User(id=username, username=username, email=admin_email, password_hash=generate_password_hash(password), role='admin', plan='student_pro', account_type='admin')
+    new_user = User(id=username, username=username, email=email, password_hash=generate_password_hash(password), role='admin', plan='student_pro', account_type='admin')
     DB['users'][new_user.id] = new_user
     save_database()
     login_user(new_user, remember=True)
@@ -1562,6 +2104,7 @@ def extend_limit():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
+
 
 
 
