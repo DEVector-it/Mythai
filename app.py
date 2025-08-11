@@ -29,6 +29,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 REQUIRED_KEYS = [
     'SECRET_KEY', 'GEMINI_API_KEY', 'SECRET_REGISTRATION_KEY',
     'SECRET_STUDENT_KEY', 'SECRET_TEACHER_KEY', 'STRIPE_WEBHOOK_SECRET',
+    'STRIPE_STUDENT_PRO_PRICE_ID' # Added for the new plan
 ]
 for key in REQUIRED_KEYS:
     if not os.environ.get(key):
@@ -49,6 +50,7 @@ SITE_CONFIG = {
     "STRIPE_PRO_PRICE_ID": os.environ.get('STRIPE_PRO_PRICE_ID'),
     "STRIPE_ULTRA_PRICE_ID": os.environ.get('STRIPE_ULTRA_PRICE_ID'),
     "STRIPE_STUDENT_PRICE_ID": os.environ.get('STRIPE_STUDENT_PRICE_ID'),
+    "STRIPE_STUDENT_PRO_PRICE_ID": os.environ.get('STRIPE_STUDENT_PRO_PRICE_ID'), # Added
     "YOUR_DOMAIN": os.environ.get('YOUR_DOMAIN', 'http://localhost:5000'),
     "SECRET_REGISTRATION_KEY": os.environ.get('SECRET_REGISTRATION_KEY'),
     "SECRET_STUDENT_KEY": os.environ.get('SECRET_STUDENT_KEY'),
@@ -297,7 +299,8 @@ PLAN_CONFIG = {
     "free": {"name": "Free", "price_string": "Free", "features": ["15 Daily Messages", "Standard Model Access", "No Image Uploads"], "color": "text-gray-300", "message_limit": 15, "can_upload": False, "model": "gemini-1.5-flash-latest", "can_tts": False},
     "pro": {"name": "Pro", "price_string": "$9.99 / month", "features": ["50 Daily Messages", "Image Uploads", "Priority Support", "Voice Chat"], "color": "text-indigo-400", "message_limit": 50, "can_upload": True, "model": "gemini-1.5-pro-latest", "can_tts": True},
     "ultra": {"name": "Ultra", "price_string": "$100 one-time", "features": ["Unlimited Messages", "Image Uploads", "Access to All Models", "Voice Chat"], "color": "text-purple-400", "message_limit": 10000, "can_upload": True, "model": "gemini-1.5-pro-latest", "can_tts": True},
-    "student": {"name": "Student", "price_string": "$4.99 / month", "features": ["100 Daily Messages", "Image Uploads", "Study Buddy Persona", "Streak & Leaderboard"], "color": "text-amber-400", "message_limit": 100, "can_upload": False, "model": "gemini-1.5-flash-latest", "can_tts": False}
+    "student": {"name": "Student", "price_string": "$4.99 / month", "features": ["100 Daily Messages", "Study Buddy Persona", "Streak & Leaderboard", "No Image Uploads"], "color": "text-amber-400", "message_limit": 100, "can_upload": False, "model": "gemini-1.5-flash-latest", "can_tts": False},
+    "student_pro": {"name": "Student Pro", "price_string": "$7.99 / month", "features": ["200 Daily Messages", "Image Uploads", "Study Buddy Persona", "Streak & Leaderboard"], "color": "text-amber-300", "message_limit": 200, "can_upload": True, "model": "gemini-1.5-pro-latest", "can_tts": False}
 }
 
 rate_limit_store = {}
@@ -352,7 +355,6 @@ HTML_CONTENT = """
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
-    <!-- THEME CHANGE: Added AdSense Script -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1136294351029434"
      crossorigin="anonymous"></script>
     <script>
@@ -594,14 +596,14 @@ HTML_CONTENT = """
                         <button id="download-chat-btn" title="Download Chat" class="p-2 rounded-lg hover:bg-slate-700/50 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>
                     </div>
                 </header>
+                <div id="student-leaderboard-container" class="flex-shrink-0"></div>
                 <div id="chat-window" class="flex-1 overflow-y-auto p-4 md:p-6 min-h-0 w-full">
-                    <div id="message-list" class="mx-auto max-w-4xl space-y-6">
+                    <div id="message-list" class="mx-auto max-w-3xl space-y-6">
                         <!-- Messages will be rendered here by JavaScript -->
                     </div>
                 </div>
                 <div class="flex-shrink-0 p-2 md:p-4 md:px-6 border-t border-slate-700/50">
                     <div class="max-w-4xl mx-auto">
-                        <div id="student-leaderboard-container" class="glassmorphism p-4 rounded-lg hidden mb-2"></div>
                         <div id="stop-generating-container" class="text-center mb-2" style="display: none;">
                             <button id="stop-generating-btn" class="bg-red-600/50 hover:bg-red-600/80 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center gap-2 mx-auto"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><rect width="10" height="10" x="3" y="3" rx="1"/></svg> Stop Generating</button>
                         </div>
@@ -1275,6 +1277,7 @@ HTML_CONTENT = """
             appState.isAITyping = true;
             appState.abortController = new AbortController();
             updateUIState();
+            let aiContentEl; // Define it here to be accessible in finally block
             try {
                 if (!appState.activeChatId) {
                     if (!await createNewChat(false)) throw new Error("Could not start chat.");
@@ -1283,7 +1286,7 @@ HTML_CONTENT = """
                     document.getElementById('message-list').innerHTML = '';
                 }
                 addMessageToDOM({ sender: 'user', content: prompt });
-                const aiContentEl = addMessageToDOM({ sender: 'model', content: '' }, true).querySelector('.message-content');
+                aiContentEl = addMessageToDOM({ sender: 'model', content: '' }, true).querySelector('.message-content');
                 userInput.value = '';
                 userInput.style.height = 'auto';
                 const formData = new FormData();
@@ -1322,8 +1325,12 @@ HTML_CONTENT = """
                     document.getElementById('chat-title').textContent = appState.chats[appState.activeChatId].title;
                 }
             } catch (err) {
-                if (err.name !== 'AbortError') {
+                if (err.name === 'AbortError') {
+                    if(aiContentEl) aiContentEl.innerHTML += "<p class='text-sm text-red-400 mt-2'>[Generation stopped by user]</p>";
+                    console.log('Fetch aborted by user.');
+                } else {
                     showToast(err.message, 'error');
+                     if(aiContentEl) aiContentEl.innerHTML = `<p class='text-red-400'>Error: ${err.message}</p>`;
                 }
             } finally {
                 appState.isAITyping = false;
@@ -1603,15 +1610,14 @@ HTML_CONTENT = """
             const leaderboardContainer = document.getElementById('student-leaderboard-container');
             if (!leaderboardContainer) return;
             const result = await apiCall('/api/student/leaderboard');
-            if (result.success) {
+            if (result.success && result.leaderboard.length > 0) {
                 leaderboardContainer.classList.remove('hidden');
-                let html = `<h3 class="text-lg font-bold mb-2">Class Leaderboard</h3>`;
-                if (result.leaderboard.length > 0) {
-                    html += `<ul class="space-y-1">${result.leaderboard.map((s, i) => `<li class="flex justify-between items-center text-sm"><span class="truncate"><strong>${i + 1}.</strong> ${s.username}</span><span class="font-mono text-yellow-400">${s.streak} days</span></li>`).join('')}</ul>`;
-                } else {
-                    html += `<p class="text-sm text-gray-400">No students have a streak yet.</p>`;
-                }
+                let html = `<div class="max-w-4xl mx-auto mb-4 p-4 glassmorphism rounded-lg"><h3 class="text-lg font-bold mb-2 text-yellow-300">Class Leaderboard</h3>`;
+                html += `<ul class="space-y-1">${result.leaderboard.map((s, i) => `<li class="flex justify-between items-center text-sm"><span class="truncate"><strong>${i + 1}.</strong> ${s.username}</span><span class="font-mono text-yellow-400">${s.streak} days</span></li>`).join('')}</ul></div>`;
                 leaderboardContainer.innerHTML = html;
+            } else {
+                 leaderboardContainer.innerHTML = '';
+                 leaderboardContainer.classList.add('hidden');
             }
         }
         async function fetchAdminData(){
@@ -2068,7 +2074,12 @@ def chat_api():
     if current_user.daily_messages >= plan_details["message_limit"]:
         return jsonify({"error": f"Daily message limit of {plan_details['message_limit']} reached."}), 429
     
-    system_instruction = "You are Myth AI, a helpful assistant." # Simplified for brevity
+    # FIX: Use a different system instruction for Study Buddy mode
+    if is_study_mode:
+        system_instruction = "You are Study Buddy, an enthusiastic and encouraging tutor AI. Your goal is to help students understand concepts without giving direct answers. Use the Socratic method, ask guiding questions, and break down complex problems into smaller steps. Always be patient and positive."
+    else:
+        system_instruction = "You are Myth AI, a helpful and versatile AI assistant."
+
     history = [{"role": "user" if msg['sender'] == 'user' else 'model', "parts": [{"text": msg['content']}]} for msg in chat['messages'][-10:] if msg.get('content')]
     
     model_input_parts = []
@@ -2093,7 +2104,8 @@ def chat_api():
 
     chat['messages'].append({'sender': 'user', 'content': prompt})
     current_user.daily_messages += 1
-    # No need to save here, will be saved after AI response.
+    # Save database after incrementing message count, before making the potentially long API call
+    save_database()
 
     model = genai.GenerativeModel(plan_details['model'], system_instruction=system_instruction)
     chat_session = model.start_chat(history=history)
@@ -2108,9 +2120,11 @@ def chat_api():
                     yield chunk.text
         except Exception as e:
             logging.error(f"Gemini stream error: {e}")
-            yield json.dumps({"error": str(e)})
+            # Yield an error message that the frontend can display
+            yield f"STREAM_ERROR: An error occurred while generating the response: {str(e)}"
             return
 
+        # Update the database with the full response only after successful completion
         chat['messages'].append({'sender': 'model', 'content': full_response_text})
         if len(chat['messages']) <= 2 and prompt:
             try:
@@ -2215,7 +2229,8 @@ def create_checkout_session():
     price_map = {
         "pro": {"id": SITE_CONFIG["STRIPE_PRO_PRICE_ID"], "mode": "subscription"},
         "ultra": {"id": SITE_CONFIG["STRIPE_ULTRA_PRICE_ID"], "mode": "payment"},
-        "student": {"id": SITE_CONFIG["STRIPE_STUDENT_PRICE_ID"], "mode": "subscription"}
+        "student": {"id": SITE_CONFIG["STRIPE_STUDENT_PRICE_ID"], "mode": "subscription"},
+        "student_pro": {"id": SITE_CONFIG["STRIPE_STUDENT_PRO_PRICE_ID"], "mode": "subscription"}
     }
     if plan_id not in price_map: return jsonify(error={'message': 'Invalid plan.'}), 400
     try:
@@ -2367,4 +2382,9 @@ def student_leaderboard_data():
 
 
 # --- Main Execution ---
-# -----Big BlaZZZZZZZZ===--[
+if __name__ == '__main__':
+    # Use the PORT environment variable if available, for compatibility with hosting platforms.
+    port = int(os.environ.get('PORT', 5000))
+    # Set debug=False for production environments.
+    app.run(host='0.0.0.0', port=port, debug=True)
+
